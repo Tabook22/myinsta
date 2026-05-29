@@ -11,6 +11,7 @@ class Settings(BaseSettings):
     library_dir: str = "./data/library"
     cors_origins: str = "http://localhost:5173,http://127.0.0.1:5173"
     whisper_model: str = "base"
+    brave_search_api_key: str = ""   # Get free key at brave.com/search/api/
 
     model_config = SettingsConfigDict(
         env_file=".env",

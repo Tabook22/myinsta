@@ -1,34 +1,104 @@
-"""Web search using Wikipedia's free Search API + DuckDuckGo Instant Answers.
+"""Web search service.
 
-No API key required. Wikipedia is used as the primary source because it has
-rich articles about songs, artists, and topics. DuckDuckGo is used as a fallback.
+Primary  : Brave Search API  (real web results, free tier 2000 req/month)
+Fallback : Wikipedia Search API (no key needed, good for songs/artists)
+
+Set MYINSTA_BRAVE_SEARCH_API_KEY in .env to enable Brave Search.
+Without the key, Wikipedia is used automatically.
 """
 import json
 import re
 import urllib.parse
 import urllib.request
 
+from app.core.config import settings
+
 _TIMEOUT = 10
 _HEADERS = {"User-Agent": "MyInsta/1.0 (https://nasserdiary.com)"}
 
-# Keywords that indicate the user wants to identify a song / find lyrics
+# Detect "what song / identify song / search lyrics" questions
 _SONG_PATTERNS = re.compile(
-    r"\b(song|music|track|artist|singer|band|nasheed|nasyid|hymn|what.+this|"
-    r"identify|find|search|lyrics|who (is|sings|sang|made|wrote)|title|name)\b",
+    r"\b(song|music|track|artist|singer|band|nasheed|nasyid|hymn|"
+    r"what.+this|identify|find|search|lyrics|"
+    r"who (is|sings|sang|made|wrote)|title|name of)\b",
     re.IGNORECASE,
 )
 
 
-def _fetch_json(url: str) -> dict:
-    req = urllib.request.Request(url, headers=_HEADERS)
+def _fetch_json(url: str, extra_headers: dict | None = None) -> dict:
+    headers = {**_HEADERS, **(extra_headers or {})}
+    req = urllib.request.Request(url, headers=headers)
     with urllib.request.urlopen(req, timeout=_TIMEOUT) as resp:
         return json.loads(resp.read().decode("utf-8"))
 
 
-# ── Wikipedia ─────────────────────────────────────────────────────────────────
+def _is_song_question(question: str) -> bool:
+    return bool(_SONG_PATTERNS.search(question))
+
+
+def _lyrics_snippet(transcript_text: str, max_chars: int = 100) -> str:
+    return transcript_text.strip()[:max_chars].strip()
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Brave Search
+# ─────────────────────────────────────────────────────────────────────────────
+
+_BRAVE_URL = "https://api.search.brave.com/res/v1/web/search"
+
+
+def _brave_search(query: str, count: int = 5) -> list[dict]:
+    """
+    Call Brave Search API. Returns list of {title, description, url}.
+    Requires MYINSTA_BRAVE_SEARCH_API_KEY in .env.
+    """
+    api_key = settings.brave_search_api_key
+    if not api_key:
+        return []
+
+    params = urllib.parse.urlencode({"q": query, "count": count})
+    url = f"{_BRAVE_URL}?{params}"
+    extra_headers = {
+        "Accept": "application/json",
+        "Accept-Encoding": "gzip",
+        "X-Subscription-Token": api_key,
+    }
+
+    try:
+        data = _fetch_json(url, extra_headers)
+        results = []
+        for item in data.get("web", {}).get("results", []):
+            results.append(
+                {
+                    "title": item.get("title", ""),
+                    "description": item.get("description", ""),
+                    "url": item.get("url", ""),
+                }
+            )
+        return results
+    except Exception as exc:
+        # Key might be invalid / rate-limited — fall through to Wikipedia
+        print(f"[web_search] Brave API error: {exc}")
+        return []
+
+
+def _format_brave_results(question: str, results: list[dict]) -> str:
+    if not results:
+        return ""
+    lines = [f'🌐 Brave Search results for: "{question}"\n']
+    for i, r in enumerate(results, 1):
+        lines.append(f"**{i}. {r['title']}**")
+        if r["description"]:
+            lines.append(r["description"])
+        lines.append(f"🔗 {r['url']}\n")
+    return "\n".join(lines)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Wikipedia fallback
+# ─────────────────────────────────────────────────────────────────────────────
 
 def _wikipedia_search(query: str, limit: int = 3) -> list[dict]:
-    """Return a list of {title, snippet, url} from Wikipedia full-text search."""
     params = urllib.parse.urlencode(
         {
             "action": "query",
@@ -47,15 +117,17 @@ def _wikipedia_search(query: str, limit: int = 3) -> list[dict]:
         for item in data.get("query", {}).get("search", []):
             title = item.get("title", "")
             snippet = re.sub(r"<[^>]+>", "", item.get("snippet", "")).strip()
-            wiki_url = f"https://en.wikipedia.org/wiki/{urllib.parse.quote(title.replace(' ', '_'))}"
-            results.append({"title": title, "snippet": snippet, "url": wiki_url})
+            wiki_url = (
+                f"https://en.wikipedia.org/wiki/"
+                f"{urllib.parse.quote(title.replace(' ', '_'))}"
+            )
+            results.append({"title": title, "description": snippet, "url": wiki_url})
         return results
     except Exception:
         return []
 
 
 def _wikipedia_summary(title: str) -> str:
-    """Fetch the introductory summary of a Wikipedia article."""
     params = urllib.parse.urlencode(
         {
             "action": "query",
@@ -70,11 +142,9 @@ def _wikipedia_summary(title: str) -> str:
     url = f"https://en.wikipedia.org/w/api.php?{params}"
     try:
         data = _fetch_json(url)
-        pages = data.get("query", {}).get("pages", {})
-        for page in pages.values():
+        for page in data.get("query", {}).get("pages", {}).values():
             extract = (page.get("extract") or "").strip()
             if extract:
-                # Return just the first paragraph (up to 600 chars)
                 first_para = extract.split("\n")[0]
                 return first_para[:600] + ("..." if len(first_para) > 600 else "")
     except Exception:
@@ -82,63 +152,25 @@ def _wikipedia_summary(title: str) -> str:
     return ""
 
 
-# ── DuckDuckGo ────────────────────────────────────────────────────────────────
-
-def _duckduckgo_instant(query: str) -> str:
-    """Try DuckDuckGo Instant Answers — returns a short abstract or empty string."""
-    params = urllib.parse.urlencode(
-        {
-            "q": query,
-            "format": "json",
-            "no_redirect": "1",
-            "no_html": "1",
-            "skip_disambig": "1",
-        }
-    )
-    url = f"https://api.duckduckgo.com/?{params}"
-    try:
-        data = _fetch_json(url)
-        return (data.get("AbstractText") or "").strip()
-    except Exception:
+def _format_wikipedia_results(question: str, results: list[dict]) -> str:
+    if not results:
         return ""
+    lines = [f'🌐 Wikipedia search results for: "{question}"\n']
+    for i, r in enumerate(results, 1):
+        lines.append(f"**{i}. {r['title']}**")
+        if r["description"]:
+            lines.append(r["description"])
+        if i == 1:
+            summary = _wikipedia_summary(r["title"])
+            if summary and summary not in r["description"]:
+                lines.append(f"\n{summary}")
+        lines.append(f"🔗 {r['url']}\n")
+    return "\n".join(lines)
 
 
-# ── Query builder ─────────────────────────────────────────────────────────────
-
-def _is_song_question(question: str) -> bool:
-    return bool(_SONG_PATTERNS.search(question))
-
-
-def _build_song_query(transcript_text: str | None, title: str | None, uploader: str | None) -> str:
-    """Build the best search query to identify a song."""
-    parts: list[str] = []
-
-    # Use first ~80 chars of transcript as lyrics snippet
-    if transcript_text:
-        snippet = transcript_text.strip()[:80].strip()
-        if snippet:
-            parts.append(f'"{snippet}"')
-
-    if uploader and uploader.lower() not in ("unknown", "none"):
-        parts.append(uploader)
-
-    parts.append("song OR nasheed OR lyrics")
-    return " ".join(parts)
-
-
-def _build_general_query(
-    question: str, title: str | None, uploader: str | None
-) -> str:
-    parts: list[str] = []
-    if uploader and uploader.lower() not in ("unknown", "none"):
-        parts.append(uploader)
-    if title and title != uploader:
-        parts.append(title)
-    parts.append(question)
-    return " ".join(parts)
-
-
-# ── Main entry point ──────────────────────────────────────────────────────────
+# ─────────────────────────────────────────────────────────────────────────────
+# Public entry point
+# ─────────────────────────────────────────────────────────────────────────────
 
 def search_web(
     question: str,
@@ -149,71 +181,55 @@ def search_web(
     """
     Search the web and return a human-readable answer.
 
-    Strategy:
-    1. If question is about a song → search Wikipedia using lyrics snippet
-    2. Otherwise → search Wikipedia using title + uploader + question
-    3. Enrich first result with a Wikipedia article summary
-    4. Fall back to DuckDuckGo if Wikipedia returns nothing
+    Uses Brave Search (if API key set) → Wikipedia → manual links fallback.
+    Song questions automatically include transcript lyrics in the search query.
     """
     is_song_q = _is_song_question(question)
 
+    # ── Build smart queries ───────────────────────────────────────────────────
+    context_parts = [p for p in [uploader, title] if p and p.lower() not in ("unknown", "none", "")]
+
     if is_song_q and transcript_text:
-        primary_query = _build_song_query(transcript_text, title, uploader)
-        fallback_query = _build_general_query(question, title, uploader)
+        # Use lyrics snippet as the primary search term
+        snippet = _lyrics_snippet(transcript_text, 100)
+        song_query = f'"{snippet}" song lyrics'
+        queries = [song_query]
+        if context_parts:
+            queries.append(" ".join(context_parts) + " " + question)
     else:
-        primary_query = _build_general_query(question, title, uploader)
-        fallback_query = question
+        base = " ".join(context_parts + [question])
+        queries = [base, question]
 
-    # ── Step 1: Wikipedia search ──────────────────────────────────────────────
-    results = _wikipedia_search(primary_query)
-    if not results and primary_query != fallback_query:
-        results = _wikipedia_search(fallback_query)
+    # ── Try Brave Search first ────────────────────────────────────────────────
+    if settings.brave_search_api_key:
+        for query in queries:
+            results = _brave_search(query)
+            if results:
+                return _format_brave_results(question, results)
 
-    if results:
-        lines: list[str] = [
-            f'🌐 Web search results for: "{question}"\n'
-        ]
-        for i, r in enumerate(results, 1):
-            lines.append(f"**{i}. {r['title']}**")
-            if r["snippet"]:
-                lines.append(r["snippet"])
-            # Fetch full summary for the top result
-            if i == 1:
-                summary = _wikipedia_summary(r["title"])
-                if summary and summary not in r["snippet"]:
-                    lines.append(f"\n{summary}")
-            lines.append(f"🔗 {r['url']}\n")
+    # ── Fall back to Wikipedia ────────────────────────────────────────────────
+    for query in queries:
+        results = _wikipedia_search(query)
+        if results:
+            return _format_wikipedia_results(question, results)
 
-        return "\n".join(lines)
-
-    # ── Step 2: DuckDuckGo fallback ───────────────────────────────────────────
-    ddg_abstract = _duckduckgo_instant(primary_query)
-    if ddg_abstract:
-        return (
-            f'🌐 Web search results for: "{question}"\n\n'
-            f"{ddg_abstract}"
-        )
-
-    # ── Step 3: Nothing found — give helpful guidance ─────────────────────────
-    context_parts = [p for p in [uploader, title] if p and p.lower() not in ("none", "unknown")]
-    context = " — ".join(context_parts) if context_parts else None
-
+    # ── Nothing found — give clickable manual search links ────────────────────
     if is_song_q and transcript_text:
-        snippet = transcript_text.strip()[:120]
+        snippet = _lyrics_snippet(transcript_text, 120)
+        encoded = urllib.parse.quote(snippet + " lyrics")
         return (
-            f'🌐 Could not automatically identify this song.\n\n'
-            f'Lyrics detected: "{snippet}..."\n\n'
-            f"Try searching manually:\n"
-            f'• Google: https://www.google.com/search?q={urllib.parse.quote(snippet + " lyrics song")}\n'
-            f'• Genius: https://genius.com/search?q={urllib.parse.quote(snippet)}\n'
-            f'• Shazam or SoundHound apps can identify songs by playing audio.'
+            f"🌐 Could not automatically identify this song.\n\n"
+            f'Lyrics detected: "{snippet}"\n\n'
+            f"Search manually:\n"
+            f"• Google: https://www.google.com/search?q={encoded}\n"
+            f"• Genius: https://genius.com/search?q={urllib.parse.quote(snippet)}\n"
+            f"• Shazam or SoundHound can identify the song from audio."
         )
 
-    manual_q = urllib.parse.quote(primary_query)
+    manual_q = urllib.parse.quote(" ".join(context_parts + [question]))
     return (
         f'🌐 No results found for: "{question}".\n\n'
-        + (f"Video: {context}\n\n" if context else "")
-        + f"Try searching manually:\n"
+        f"Search manually:\n"
         f"• Google: https://www.google.com/search?q={manual_q}\n"
         f"• Wikipedia: https://en.wikipedia.org/w/index.php?search={manual_q}"
     )

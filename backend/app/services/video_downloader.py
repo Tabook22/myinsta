@@ -54,10 +54,21 @@ def download_video(url: str, output_dir: Path, video_id: int) -> dict:
             raise RuntimeError("Video download failed: output file not found")
         local_path = matches[0]
 
+    # uploader_url  → full profile URL  e.g. https://www.instagram.com/regita_aya/
+    # uploader_id   → username           e.g. regita_aya
+    # uploader      → display name       e.g. Regita Darsono Putri
+    uploader_url = info.get("uploader_url") or info.get("channel_url") or None
+    uploader_id  = info.get("uploader_id") or info.get("channel_id") or None
+
+    # Build profile URL from username if yt-dlp didn't return one directly
+    if not uploader_url and uploader_id and "instagram" in url.lower():
+        uploader_url = f"https://www.instagram.com/{uploader_id}/"
+
     return {
         "title": info.get("title"),
         "description": info.get("description"),
         "uploader": info.get("uploader") or info.get("channel"),
+        "uploader_url": uploader_url,
         "duration_seconds": info.get("duration"),
         "thumbnail_url": info.get("thumbnail"),
         "local_video_path": str(local_path.resolve()),

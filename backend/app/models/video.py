@@ -37,6 +37,7 @@ class VideoResponse(BaseModel):
     storage_folder: str | None = None
     status: VideoStatus
     content_type: ContentType = "unknown"
+    creator_url: str | None = None
     error_message: str | None = None
     video_url: str | None = None
     transcript: TranscriptResponse | None = None

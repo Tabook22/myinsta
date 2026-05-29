@@ -106,13 +106,13 @@ function groupedSections(videos, selectedId, onView, onEdit, handleDelete) {
               >
                 <td className="library-title-cell">
                   <span className="library-title-text">{item.title || `Video #${item.id}`}</span>
-                  {item.uploader && (
+                  {item.creator_url && (
                     <a
                       className="insta-link"
-                      href={`https://www.instagram.com/${item.uploader}/`}
+                      href={item.creator_url}
                       target="_blank"
                       rel="noreferrer"
-                      title={`Open @${item.uploader} on Instagram`}
+                      title={`Open ${item.uploader || 'creator'} on Instagram`}
                       onClick={(e) => e.stopPropagation()}
                     >
                       {/* Instagram icon */}

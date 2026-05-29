@@ -63,6 +63,7 @@ def _row_to_video_response(row, transcript_row=None) -> VideoResponse:
         storage_folder=row["storage_folder"],
         status=row["status"],
         content_type=row["content_type"] if row["content_type"] else "unknown",
+        creator_url=row["creator_url"],
         error_message=row["error_message"],
         video_url=video_url,
         transcript=transcript,
@@ -139,7 +140,7 @@ def process_video(video_id: int) -> None:
                     duration_seconds = ?, thumbnail_url = ?,
                     local_video_path = ?, local_audio_path = ?,
                     storage_stamp = ?, storage_folder = ?, local_transcript_path = ?,
-                    content_type = ?
+                    content_type = ?, creator_url = ?
                 WHERE id = ?
                 """,
                 (
@@ -155,6 +156,7 @@ def process_video(video_id: int) -> None:
                     library_result["storage_folder"],
                     library_result["local_transcript_path"],
                     content_type,
+                    download_result.get("uploader_url"),
                     video_id,
                 ),
             )

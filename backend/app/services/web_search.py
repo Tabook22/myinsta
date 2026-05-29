@@ -184,6 +184,18 @@ def _is_song_question(question: str) -> bool:
     return bool(_SONG_PATTERNS.search(question))
 
 
+# Detect questions specifically about the creator / uploader
+_CREATOR_PATTERNS = re.compile(
+    r"\b(creator|author|uploader|who (made|posted|uploaded|is|are)|"
+    r"channel|account|profile|follow|about (him|her|them|this person|this creator))\b",
+    re.IGNORECASE,
+)
+
+
+def _is_creator_question(question: str) -> bool:
+    return bool(_CREATOR_PATTERNS.search(question))
+
+
 def _lyrics_snippet(text: str, max_chars: int = 100) -> str:
     return text.strip()[:max_chars].strip()
 
@@ -197,19 +209,31 @@ def search_web(
     """
     Search the web and return a human-readable answer string.
     Brave Search → Wikipedia → clickable manual links.
+
+    Query strategy:
+    - Song questions   → use transcript lyrics as search term
+    - Creator questions → include uploader name
+    - General questions → use the question directly (no social media bias)
     """
-    is_song_q = _is_song_question(question)
+    is_song_q    = _is_song_question(question)
+    is_creator_q = _is_creator_question(question)
+
     context_parts = [
         p for p in [uploader, title]
         if p and p.lower() not in ("unknown", "none", "")
     ]
 
-    # Build search queries
+    # Build search queries — order matters (best query first)
     if is_song_q and transcript_text:
+        # Use lyrics to identify the song
         snippet = _lyrics_snippet(transcript_text, 100)
-        queries = [f'"{snippet}" song lyrics', " ".join(context_parts + [question])]
+        queries = [f'"{snippet}" song lyrics', question]
+    elif is_creator_q and uploader:
+        # User is asking about the creator → include their name
+        queries = [f"{uploader} {question}", question]
     else:
-        queries = [" ".join(context_parts + [question]), question]
+        # General web question → just use what the user typed, no social media bias
+        queries = [question]
 
     # Remove empty/duplicate queries
     seen: set[str] = set()

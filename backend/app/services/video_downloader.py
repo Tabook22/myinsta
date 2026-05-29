@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 
 import yt_dlp
@@ -25,6 +26,10 @@ def download_video(url: str, output_dir: Path, video_id: int) -> dict:
         "retries": 3,
         "fragment_retries": 3,
     }
+
+    cookies_file = os.getenv("INSTAGRAM_COOKIES_FILE")
+    if cookies_file and Path(cookies_file).exists():
+        ydl_opts["cookiefile"] = cookies_file
 
     last_error = None
     for attempt in range(2):

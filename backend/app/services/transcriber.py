@@ -1,7 +1,5 @@
 from pathlib import Path
 
-import whisper
-
 from app.core.config import settings
 
 _model = None
@@ -9,8 +7,18 @@ _model = None
 
 def _get_model():
     global _model
+
+    try:
+        import whisper
+    except ModuleNotFoundError as exc:
+        raise RuntimeError(
+            "Whisper is not installed on this server. "
+            "Install openai-whisper before using transcription."
+        ) from exc
+
     if _model is None:
         _model = whisper.load_model(settings.whisper_model)
+
     return _model
 
 

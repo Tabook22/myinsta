@@ -31,3 +31,29 @@ Thumbs.db
 
 # Logs
 *.log
+# Environment files
+.env
+**/.env
+.env.*
+
+# Python virtual environments
+.venv/
+**/.venv/
+
+# Python cache
+__pycache__/
+**/__pycache__/
+*.pyc
+
+# Instagram cookies
+instagram_cookies.txt
+*.txt.cookies
+
+# SQLite
+*.db
+*.sqlite
+*.sqlite3
+
+# Local media
+media/
+downloads/

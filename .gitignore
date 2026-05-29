@@ -1,0 +1,33 @@
+# Python
+__pycache__/
+*.pyc
+venv/
+.venv/
+.pytest_cache/
+.uv-cache/
+.env
+
+# SQLite
+*.db
+*.sqlite3
+
+# React
+node_modules/
+dist/
+
+# Local generated app data
+backend/data/downloads/*
+backend/data/audio/*
+backend/data/library/*
+!backend/data/**/.gitkeep
+frontend/dist/
+
+# VS Code
+.vscode/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log

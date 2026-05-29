@@ -14,14 +14,20 @@ export default function HomePage() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [showEditor, setShowEditor] = useState(false)
   const [error, setError] = useState('')
+  const [backendError, setBackendError] = useState('')
+  const [loadingLibrary, setLoadingLibrary] = useState(true)
   const detailRef = useRef(null)
 
   async function loadRecentVideos() {
     try {
       const videos = await listVideos()
       setRecentVideos(videos)
-    } catch {
-      // Keep the page usable if the list endpoint fails.
+      setBackendError('')
+    } catch (err) {
+      // Show a banner but keep the rest of the page usable.
+      setBackendError(err.message)
+    } finally {
+      setLoadingLibrary(false)
     }
   }
 
@@ -95,11 +101,24 @@ export default function HomePage() {
         <p>Paste an Instagram video link, save it to your library, transcribe it, then chat with the transcript.</p>
       </section>
 
+      {backendError && (
+        <div className="backend-error-banner">
+          <span>⚠️ Backend offline: {backendError}</span>
+          <button type="button" onClick={loadRecentVideos}>Retry</button>
+        </div>
+      )}
+
       <section className="card">
         <UrlSubmitForm onSubmit={handleSubmit} isSubmitting={isSubmitting} />
         {error ? <p className="error">{error}</p> : null}
       </section>
 
+      {loadingLibrary ? (
+        <div className="library-loading">
+          <span className="library-loading-spinner" />
+          Connecting to server…
+        </div>
+      ) : (
       <VideoLibrary
         videos={recentVideos}
         selectedId={video?.id}
@@ -107,6 +126,7 @@ export default function HomePage() {
         onEdit={(videoId) => openVideo(videoId, { edit: true })}
         onDeleted={handleVideoDeleted}
       />
+      )}
 
       {video ? (
         <section className="grid" ref={detailRef}>

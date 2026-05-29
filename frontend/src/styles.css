@@ -98,6 +98,60 @@ button:disabled {
   color: #b91c1c;
 }
 
+/* Backend offline banner */
+.backend-error-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  background: #fef2f2;
+  border: 1px solid #fca5a5;
+  border-radius: 10px;
+  padding: 12px 16px;
+  color: #b91c1c;
+  font-size: 14px;
+}
+
+.backend-error-banner button {
+  background: #dc2626;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  padding: 6px 14px;
+  font-size: 13px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.backend-error-banner button:hover {
+  background: #b91c1c;
+}
+
+/* Library loading spinner */
+.library-loading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #64748b;
+  font-size: 14px;
+  padding: 20px 0;
+}
+
+.library-loading-spinner {
+  display: inline-block;
+  width: 18px;
+  height: 18px;
+  border: 2px solid #e2e8f0;
+  border-top-color: #4f46e5;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+  flex-shrink: 0;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
 .chat-box {
   min-height: 220px;
   max-height: 420px;
@@ -236,21 +290,57 @@ button:disabled {
 
 .library-actions {
   display: flex;
-  flex-wrap: wrap;
+  align-items: center;
   gap: 6px;
 }
 
-.action-button {
-  padding: 8px 12px;
-  font-size: 13px;
+/* Icon-only action buttons */
+.icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.15s, transform 0.1s;
+  flex-shrink: 0;
 }
 
-.action-button-secondary {
+.icon-btn svg {
+  width: 16px;
+  height: 16px;
+  display: block;
+}
+
+.icon-btn:active {
+  transform: scale(0.92);
+}
+
+.icon-btn-view {
+  background: #4f46e5;
+  color: #fff;
+}
+.icon-btn-view:hover {
+  background: #4338ca;
+}
+
+.icon-btn-edit {
   background: #64748b;
+  color: #fff;
+}
+.icon-btn-edit:hover {
+  background: #475569;
 }
 
-.action-button-danger {
+.icon-btn-delete {
   background: #dc2626;
+  color: #fff;
+}
+.icon-btn-delete:hover {
+  background: #b91c1c;
 }
 
 .detail-actions {

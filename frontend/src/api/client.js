@@ -14,14 +14,30 @@ function parseErrorMessage(text) {
   return text
 }
 
+const REQUEST_TIMEOUT_MS = 10_000 // 10 seconds — fail fast if backend is down
+
 async function request(path, options = {}) {
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    headers: {
-      'Content-Type': 'application/json',
-      ...(options.headers ?? {}),
-    },
-    ...options,
-  })
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
+
+  let response
+  try {
+    response = await fetch(`${API_BASE_URL}${path}`, {
+      headers: {
+        'Content-Type': 'application/json',
+        ...(options.headers ?? {}),
+      },
+      signal: controller.signal,
+      ...options,
+    })
+  } catch (err) {
+    if (err.name === 'AbortError') {
+      throw new Error('Server is not responding — please check back in a moment.')
+    }
+    throw new Error('Cannot reach server — check your connection.')
+  } finally {
+    clearTimeout(timer)
+  }
 
   if (!response.ok) {
     const text = await response.text()

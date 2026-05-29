@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import settings
 from app.db.database import init_db
-from app.routes import health, videos
+from app.routes import health, search, videos
 
 app = FastAPI(title="MyInsta API", version="0.1.0")
 
@@ -23,3 +23,4 @@ def on_startup() -> None:
 
 app.include_router(health.router)
 app.include_router(videos.router, prefix="/api")
+app.include_router(search.router, prefix="/api")

@@ -6,6 +6,7 @@ Fallback : Wikipedia Search API (no key needed, good for songs/artists)
 Set MYINSTA_BRAVE_SEARCH_API_KEY in .env to enable Brave Search.
 Without the key, Wikipedia is used automatically.
 """
+import gzip
 import json
 import re
 import urllib.parse
@@ -14,7 +15,6 @@ import urllib.request
 from app.core.config import settings
 
 _TIMEOUT = 10
-_HEADERS = {"User-Agent": "MyInsta/1.0 (https://nasserdiary.com)"}
 
 # Detect "what song / identify song / search lyrics" questions
 _SONG_PATTERNS = re.compile(
@@ -24,70 +24,79 @@ _SONG_PATTERNS = re.compile(
     re.IGNORECASE,
 )
 
+_BRAVE_URL = "https://api.search.brave.com/res/v1/web/search"
 
-def _fetch_json(url: str, extra_headers: dict | None = None) -> dict:
-    headers = {**_HEADERS, **(extra_headers or {})}
-    req = urllib.request.Request(url, headers=headers)
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Low-level HTTP helper — handles gzip transparently
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _fetch_json(url: str, headers: dict | None = None) -> dict:
+    """Fetch a URL and return parsed JSON. Handles gzip transparently."""
+    req = urllib.request.Request(url, headers=headers or {})
     with urllib.request.urlopen(req, timeout=_TIMEOUT) as resp:
-        return json.loads(resp.read().decode("utf-8"))
-
-
-def _is_song_question(question: str) -> bool:
-    return bool(_SONG_PATTERNS.search(question))
-
-
-def _lyrics_snippet(transcript_text: str, max_chars: int = 100) -> str:
-    return transcript_text.strip()[:max_chars].strip()
+        raw = resp.read()
+        # Decompress if the server returned gzip
+        if resp.headers.get("Content-Encoding") == "gzip":
+            raw = gzip.decompress(raw)
+        return json.loads(raw.decode("utf-8"))
 
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Brave Search
 # ─────────────────────────────────────────────────────────────────────────────
 
-_BRAVE_URL = "https://api.search.brave.com/res/v1/web/search"
-
-
-def _brave_search(query: str, count: int = 5) -> list[dict]:
+def brave_search_raw(query: str, count: int = 5) -> tuple[list[dict], str | None]:
     """
-    Call Brave Search API. Returns list of {title, description, url}.
-    Requires MYINSTA_BRAVE_SEARCH_API_KEY in .env.
+    Call Brave Search API.
+    Returns (results_list, error_message).
+    error_message is None on success.
     """
-    api_key = settings.brave_search_api_key
+    api_key = (settings.brave_search_api_key or "").strip()
     if not api_key:
-        return []
+        return [], "No Brave API key configured (MYINSTA_BRAVE_SEARCH_API_KEY)"
 
     params = urllib.parse.urlencode({"q": query, "count": count})
     url = f"{_BRAVE_URL}?{params}"
-    extra_headers = {
+    headers = {
         "Accept": "application/json",
-        "Accept-Encoding": "gzip",
         "X-Subscription-Token": api_key,
+        "User-Agent": "MyInsta/1.0",
     }
 
     try:
-        data = _fetch_json(url, extra_headers)
+        data = _fetch_json(url, headers)
+
+        # Check for API-level errors
+        if "error" in data:
+            return [], f"Brave API error: {data['error']}"
+        if "message" in data and "web" not in data:
+            return [], f"Brave API message: {data['message']}"
+
         results = []
         for item in data.get("web", {}).get("results", []):
-            results.append(
-                {
-                    "title": item.get("title", ""),
-                    "description": item.get("description", ""),
-                    "url": item.get("url", ""),
-                }
-            )
-        return results
+            results.append({
+                "title": item.get("title", ""),
+                "description": item.get("description", ""),
+                "url": item.get("url", ""),
+            })
+
+        if not results:
+            return [], "Brave returned 0 results for this query"
+
+        return results, None
+
+    except urllib.error.HTTPError as exc:
+        body = exc.read().decode("utf-8", errors="replace")
+        return [], f"Brave HTTP {exc.code}: {body[:300]}"
     except Exception as exc:
-        # Key might be invalid / rate-limited — fall through to Wikipedia
-        print(f"[web_search] Brave API error: {exc}")
-        return []
+        return [], f"Brave request failed: {exc}"
 
 
-def _format_brave_results(question: str, results: list[dict]) -> str:
-    if not results:
-        return ""
-    lines = [f'🌐 Brave Search results for: "{question}"\n']
+def _format_results(source: str, question: str, results: list[dict]) -> str:
+    lines = [f"🌐 {source} results for: \"{question}\"\n"]
     for i, r in enumerate(results, 1):
-        lines.append(f"**{i}. {r['title']}**")
+        lines.append(f"{i}. {r['title']}")
         if r["description"]:
             lines.append(r["description"])
         lines.append(f"🔗 {r['url']}\n")
@@ -99,17 +108,15 @@ def _format_brave_results(question: str, results: list[dict]) -> str:
 # ─────────────────────────────────────────────────────────────────────────────
 
 def _wikipedia_search(query: str, limit: int = 3) -> list[dict]:
-    params = urllib.parse.urlencode(
-        {
-            "action": "query",
-            "list": "search",
-            "srsearch": query,
-            "format": "json",
-            "srlimit": limit,
-            "srprop": "snippet",
-            "origin": "*",
-        }
-    )
+    params = urllib.parse.urlencode({
+        "action": "query",
+        "list": "search",
+        "srsearch": query,
+        "format": "json",
+        "srlimit": limit,
+        "srprop": "snippet",
+        "origin": "*",
+    })
     url = f"https://en.wikipedia.org/w/api.php?{params}"
     try:
         data = _fetch_json(url)
@@ -118,8 +125,8 @@ def _wikipedia_search(query: str, limit: int = 3) -> list[dict]:
             title = item.get("title", "")
             snippet = re.sub(r"<[^>]+>", "", item.get("snippet", "")).strip()
             wiki_url = (
-                f"https://en.wikipedia.org/wiki/"
-                f"{urllib.parse.quote(title.replace(' ', '_'))}"
+                "https://en.wikipedia.org/wiki/"
+                + urllib.parse.quote(title.replace(" ", "_"))
             )
             results.append({"title": title, "description": snippet, "url": wiki_url})
         return results
@@ -128,49 +135,58 @@ def _wikipedia_search(query: str, limit: int = 3) -> list[dict]:
 
 
 def _wikipedia_summary(title: str) -> str:
-    params = urllib.parse.urlencode(
-        {
-            "action": "query",
-            "titles": title,
-            "prop": "extracts",
-            "exintro": "true",
-            "explaintext": "true",
-            "format": "json",
-            "origin": "*",
-        }
-    )
+    params = urllib.parse.urlencode({
+        "action": "query",
+        "titles": title,
+        "prop": "extracts",
+        "exintro": "true",
+        "explaintext": "true",
+        "format": "json",
+        "origin": "*",
+    })
     url = f"https://en.wikipedia.org/w/api.php?{params}"
     try:
         data = _fetch_json(url)
         for page in data.get("query", {}).get("pages", {}).values():
             extract = (page.get("extract") or "").strip()
             if extract:
-                first_para = extract.split("\n")[0]
-                return first_para[:600] + ("..." if len(first_para) > 600 else "")
+                para = extract.split("\n")[0]
+                return para[:600] + ("..." if len(para) > 600 else "")
     except Exception:
         pass
     return ""
 
 
-def _format_wikipedia_results(question: str, results: list[dict]) -> str:
-    if not results:
-        return ""
-    lines = [f'🌐 Wikipedia search results for: "{question}"\n']
-    for i, r in enumerate(results, 1):
-        lines.append(f"**{i}. {r['title']}**")
-        if r["description"]:
-            lines.append(r["description"])
-        if i == 1:
-            summary = _wikipedia_summary(r["title"])
-            if summary and summary not in r["description"]:
-                lines.append(f"\n{summary}")
-        lines.append(f"🔗 {r['url']}\n")
-    return "\n".join(lines)
+# ─────────────────────────────────────────────────────────────────────────────
+# Diagnostic — called by the /api/search/test endpoint
+# ─────────────────────────────────────────────────────────────────────────────
+
+def diagnose() -> dict:
+    """Return a dict describing the current search configuration and a test call."""
+    api_key = (settings.brave_search_api_key or "").strip()
+    key_preview = f"{api_key[:6]}...{api_key[-4:]}" if len(api_key) > 10 else ("(not set)" if not api_key else "(too short)")
+
+    results, error = brave_search_raw("Python programming language", count=1)
+    return {
+        "brave_key_configured": bool(api_key),
+        "brave_key_preview": key_preview,
+        "brave_test_error": error,
+        "brave_test_results_count": len(results),
+        "brave_test_first_title": results[0]["title"] if results else None,
+    }
 
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Public entry point
 # ─────────────────────────────────────────────────────────────────────────────
+
+def _is_song_question(question: str) -> bool:
+    return bool(_SONG_PATTERNS.search(question))
+
+
+def _lyrics_snippet(text: str, max_chars: int = 100) -> str:
+    return text.strip()[:max_chars].strip()
+
 
 def search_web(
     question: str,
@@ -179,56 +195,73 @@ def search_web(
     transcript_text: str | None = None,
 ) -> str:
     """
-    Search the web and return a human-readable answer.
-
-    Uses Brave Search (if API key set) → Wikipedia → manual links fallback.
-    Song questions automatically include transcript lyrics in the search query.
+    Search the web and return a human-readable answer string.
+    Brave Search → Wikipedia → clickable manual links.
     """
     is_song_q = _is_song_question(question)
+    context_parts = [
+        p for p in [uploader, title]
+        if p and p.lower() not in ("unknown", "none", "")
+    ]
 
-    # ── Build smart queries ───────────────────────────────────────────────────
-    context_parts = [p for p in [uploader, title] if p and p.lower() not in ("unknown", "none", "")]
-
+    # Build search queries
     if is_song_q and transcript_text:
-        # Use lyrics snippet as the primary search term
         snippet = _lyrics_snippet(transcript_text, 100)
-        song_query = f'"{snippet}" song lyrics'
-        queries = [song_query]
-        if context_parts:
-            queries.append(" ".join(context_parts) + " " + question)
+        queries = [f'"{snippet}" song lyrics', " ".join(context_parts + [question])]
     else:
-        base = " ".join(context_parts + [question])
-        queries = [base, question]
+        queries = [" ".join(context_parts + [question]), question]
 
-    # ── Try Brave Search first ────────────────────────────────────────────────
-    if settings.brave_search_api_key:
+    # Remove empty/duplicate queries
+    seen: set[str] = set()
+    queries = [q for q in queries if q.strip() and not (q in seen or seen.add(q))]
+
+    brave_errors: list[str] = []
+
+    # ── 1. Brave Search ───────────────────────────────────────────────────────
+    api_key = (settings.brave_search_api_key or "").strip()
+    if api_key:
         for query in queries:
-            results = _brave_search(query)
+            results, error = brave_search_raw(query)
             if results:
-                return _format_brave_results(question, results)
+                return _format_results("Brave Search", question, results)
+            if error:
+                brave_errors.append(error)
+    else:
+        brave_errors.append("Brave API key not configured")
 
-    # ── Fall back to Wikipedia ────────────────────────────────────────────────
+    # ── 2. Wikipedia fallback ─────────────────────────────────────────────────
     for query in queries:
         results = _wikipedia_search(query)
         if results:
-            return _format_wikipedia_results(question, results)
+            # Enrich first result with article summary
+            if results[0]["title"]:
+                summary = _wikipedia_summary(results[0]["title"])
+                if summary:
+                    results[0]["description"] = (
+                        results[0]["description"] + "\n\n" + summary
+                    ).strip()
+            return _format_results("Wikipedia", question, results)
 
-    # ── Nothing found — give clickable manual search links ────────────────────
+    # ── 3. Nothing found — show what went wrong + manual links ────────────────
+    error_note = ""
+    if brave_errors:
+        error_note = f"\n\n⚠️ Brave Search issue: {brave_errors[0]}"
+
     if is_song_q and transcript_text:
         snippet = _lyrics_snippet(transcript_text, 120)
-        encoded = urllib.parse.quote(snippet + " lyrics")
+        enc = urllib.parse.quote(snippet + " lyrics")
         return (
-            f"🌐 Could not automatically identify this song.\n\n"
-            f'Lyrics detected: "{snippet}"\n\n'
+            f"🌐 Could not automatically identify this song.{error_note}\n\n"
+            f'Lyrics found: "{snippet}"\n\n'
             f"Search manually:\n"
-            f"• Google: https://www.google.com/search?q={encoded}\n"
+            f"• Google: https://www.google.com/search?q={enc}\n"
             f"• Genius: https://genius.com/search?q={urllib.parse.quote(snippet)}\n"
-            f"• Shazam or SoundHound can identify the song from audio."
+            f"• Shazam / SoundHound apps can identify songs by audio."
         )
 
     manual_q = urllib.parse.quote(" ".join(context_parts + [question]))
     return (
-        f'🌐 No results found for: "{question}".\n\n'
+        f"🌐 No results found.{error_note}\n\n"
         f"Search manually:\n"
         f"• Google: https://www.google.com/search?q={manual_q}\n"
         f"• Wikipedia: https://en.wikipedia.org/w/index.php?search={manual_q}"

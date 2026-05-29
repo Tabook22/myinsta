@@ -367,6 +367,7 @@ def chat_with_video(video_id: int, payload: ChatRequest) -> ChatResponse:
                 message,
                 title=video_row["title"] if video_row else None,
                 uploader=video_row["uploader"] if video_row else None,
+                transcript_text=full_text or None,
             )
         else:
             answer = answer_from_transcript(message, full_text, segments)

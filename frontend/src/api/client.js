@@ -88,10 +88,10 @@ export function deleteVideo(videoId) {
   })
 }
 
-export function chatWithVideo(videoId, message) {
+export function chatWithVideo(videoId, message, mode = 'transcript') {
   return request(`/api/videos/${videoId}/chat`, {
     method: 'POST',
-    body: JSON.stringify({ message }),
+    body: JSON.stringify({ message, mode }),
   })
 }
 

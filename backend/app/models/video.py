@@ -4,6 +4,8 @@ from pydantic import BaseModel, HttpUrl
 
 
 VideoStatus = Literal["queued", "processing", "ready", "failed"]
+ContentType = Literal["speech", "music", "unknown"]
+ChatMode = Literal["transcript", "web"]
 
 
 class VideoCreateRequest(BaseModel):
@@ -34,6 +36,7 @@ class VideoResponse(BaseModel):
     storage_stamp: str | None = None
     storage_folder: str | None = None
     status: VideoStatus
+    content_type: ContentType = "unknown"
     error_message: str | None = None
     video_url: str | None = None
     transcript: TranscriptResponse | None = None
@@ -43,6 +46,7 @@ class VideoResponse(BaseModel):
 
 class ChatRequest(BaseModel):
     message: str
+    mode: ChatMode = "transcript"
 
 
 class ChatMessageResponse(BaseModel):

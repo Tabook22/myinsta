@@ -9,6 +9,7 @@ MIGRATIONS = [
     "ALTER TABLE videos ADD COLUMN storage_stamp TEXT",
     "ALTER TABLE videos ADD COLUMN storage_folder TEXT",
     "ALTER TABLE videos ADD COLUMN local_transcript_path TEXT",
+    "ALTER TABLE videos ADD COLUMN content_type TEXT NOT NULL DEFAULT 'unknown'",
 ]
 
 

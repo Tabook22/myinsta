@@ -18,13 +18,14 @@ from app.models.video import (
 )
 from app.services.audio_extractor import extract_audio
 from app.services.chat_service import answer_from_transcript
+from app.services.web_search import search_web
 from app.services.library_storage import (
     delete_library_folder,
     save_to_library,
     update_metadata_file,
     update_transcript_file,
 )
-from app.services.transcriber import transcribe_audio
+from app.services.transcriber import detect_content_type, transcribe_audio
 from app.services.video_downloader import download_video
 
 router = APIRouter(prefix="/videos", tags=["videos"])
@@ -61,6 +62,7 @@ def _row_to_video_response(row, transcript_row=None) -> VideoResponse:
         storage_stamp=row["storage_stamp"],
         storage_folder=row["storage_folder"],
         status=row["status"],
+        content_type=row["content_type"] if row["content_type"] else "unknown",
         error_message=row["error_message"],
         video_url=video_url,
         transcript=transcript,
@@ -108,6 +110,11 @@ def process_video(video_id: int) -> None:
         audio_path = extract_audio(video_path, settings.audio_path)
         transcript_result = transcribe_audio(audio_path)
 
+        content_type = detect_content_type(
+            transcript_result["full_text"],
+            download_result.get("duration_seconds"),
+        )
+
         library_result = save_to_library(
             settings.library_path,
             title=download_result["title"] or f"video-{video_id}",
@@ -131,7 +138,8 @@ def process_video(video_id: int) -> None:
                 SET platform = ?, title = ?, description = ?, uploader = ?,
                     duration_seconds = ?, thumbnail_url = ?,
                     local_video_path = ?, local_audio_path = ?,
-                    storage_stamp = ?, storage_folder = ?, local_transcript_path = ?
+                    storage_stamp = ?, storage_folder = ?, local_transcript_path = ?,
+                    content_type = ?
                 WHERE id = ?
                 """,
                 (
@@ -146,6 +154,7 @@ def process_video(video_id: int) -> None:
                     library_result["storage_stamp"],
                     library_result["storage_folder"],
                     library_result["local_transcript_path"],
+                    content_type,
                     video_id,
                 ),
             )
@@ -341,6 +350,10 @@ def chat_with_video(video_id: int, payload: ChatRequest) -> ChatResponse:
             "SELECT full_text, segments_json FROM transcripts WHERE video_id = ?",
             (video_id,),
         ).fetchone()
+        video_row = conn.execute(
+            "SELECT title, uploader FROM videos WHERE id = ?",
+            (video_id,),
+        ).fetchone()
 
         segments = None
         full_text = ""
@@ -349,7 +362,14 @@ def chat_with_video(video_id: int, payload: ChatRequest) -> ChatResponse:
             if transcript_row["segments_json"]:
                 segments = json.loads(transcript_row["segments_json"])
 
-        answer = answer_from_transcript(message, full_text, segments)
+        if payload.mode == "web":
+            answer = search_web(
+                message,
+                title=video_row["title"] if video_row else None,
+                uploader=video_row["uploader"] if video_row else None,
+            )
+        else:
+            answer = answer_from_transcript(message, full_text, segments)
 
         conn.execute(
             "INSERT INTO chat_messages (video_id, role, content) VALUES (?, ?, ?)",

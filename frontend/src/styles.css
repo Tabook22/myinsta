@@ -364,6 +364,60 @@ button:disabled {
   max-width: 220px;
 }
 
+.library-title-cell {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.library-title-text {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Instagram icon link in library row */
+.insta-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #e1306c;
+  flex-shrink: 0;
+  transition: color 0.15s, transform 0.15s;
+  text-decoration: none;
+}
+
+.insta-link:hover {
+  color: #c13584;
+  transform: scale(1.2);
+}
+
+.insta-link svg {
+  width: 16px;
+  height: 16px;
+}
+
+/* Creator link in video detail panel */
+.creator-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: #4f46e5;
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.creator-link:hover {
+  text-decoration: underline;
+  color: #4338ca;
+}
+
+.creator-link svg {
+  width: 13px;
+  height: 13px;
+  flex-shrink: 0;
+}
+
 .library-stamp-cell {
   color: #64748b;
   font-size: 12px;

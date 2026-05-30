@@ -1,17 +1,41 @@
 :root {
   color: #1f2937;
   background: #f8fafc;
-  /* Arabic fonts (Noto Sans Arabic / Cairo) appended as fallback */
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
     "Segoe UI", "Noto Sans Arabic", "Cairo", "Tahoma", Arial, sans-serif;
 }
 
-* {
+/* ── Global reset ───────────────────────────────────────────────────────────
+   min-width: 0 is critical: flex/grid items default to min-width: auto which
+   means they won't shrink below their content size and overflow their parent.
+   overflow-x: hidden on html/body stops any overflowing element from making
+   the page wider than the viewport.
+─────────────────────────────────────────────────────────────────────────── */
+*, *::before, *::after {
   box-sizing: border-box;
+  min-width: 0;
+}
+
+html {
+  overflow-x: hidden;
 }
 
 body {
   margin: 0;
+  overflow-x: hidden;
+  width: 100%;
+}
+
+/* All media stays within its container */
+img, video, audio, svg {
+  max-width: 100%;
+  height: auto;
+}
+
+/* Long text that could overflow (URLs, filenames, code) always breaks */
+p, li, td, th, label, span, a {
+  word-break: break-word;
+  overflow-wrap: anywhere;
 }
 
 button,
@@ -21,6 +45,7 @@ textarea {
 }
 
 .page {
+  width: 100%;
   max-width: 1040px;
   margin: 0 auto;
   padding: 40px 20px;
@@ -97,7 +122,8 @@ textarea {
 
 .grid {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(280px, 360px);
+  /* Second column (chat): min 0 so it can shrink on narrow viewports */
+  grid-template-columns: minmax(0, 1fr) minmax(0, 360px);
   gap: 20px;
   margin-top: 20px;
 }
@@ -414,19 +440,20 @@ button:disabled {
 
 .library-title-cell {
   font-weight: 600;
-  max-width: 220px;
-}
-
-.library-title-cell {
+  /* no max-width — let flexbox/grid control the size */
   display: flex;
   align-items: center;
   gap: 6px;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  overflow: hidden;
 }
 
 .library-title-text {
   flex: 1;
   min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* Instagram icon link in library row */
@@ -474,14 +501,15 @@ button:disabled {
 .library-stamp-cell {
   color: #64748b;
   font-size: 12px;
-  max-width: 240px;
-  word-break: break-all;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .library-date-cell {
-  white-space: nowrap;
   color: #64748b;
   font-size: 13px;
+  white-space: nowrap;
 }
 
 .library-actions {
@@ -1025,161 +1053,164 @@ button:disabled {
 
 /* ═══════════════════════════════════════════════════════════
    RESPONSIVE — Tablet  ≤ 800 px
+   Two-column → single column, slightly tighter spacing.
 ═══════════════════════════════════════════════════════════ */
 @media (max-width: 800px) {
-  .page { padding: 24px 16px; }
-
-  .hero { margin-bottom: 20px; }
-  .hero h1 { font-size: 34px; }
+  .page  { padding: 20px 16px; }
+  .hero  { margin-bottom: 18px; }
+  .hero h1 { font-size: 32px; }
   .hero-top { flex-wrap: wrap; }
   .lang-toggle { margin-top: 0; }
-
   .card { padding: 16px; }
 
-  /* Single-column layout */
+  /* Stack the two panels vertically */
   .grid { grid-template-columns: 1fr; }
 
-  /* Chat panel comes first visually when stacked */
-  .grid > .card:last-child { order: -1; }
-
-  /* Hide "Saved as" column — too wide for tablet */
+  /* Hide "Saved as" column on narrow viewport */
   .library-table th:nth-child(2),
   .library-table td:nth-child(2) { display: none; }
 }
 
 /* ═══════════════════════════════════════════════════════════
-   RESPONSIVE — Mobile  ≤ 640 px
+   RESPONSIVE — Mobile  ≤ 600 px
+   Full mobile optimisation: card library, stacked form,
+   scrolling toolbar, touch targets, fluid widths.
 ═══════════════════════════════════════════════════════════ */
-@media (max-width: 640px) {
-  /* ── Page shell ── */
-  .page { padding: 14px 10px; }
-  .hero { margin-bottom: 14px; }
-  .hero h1 { font-size: 26px; letter-spacing: -0.5px; }
-  .hero p  { font-size: 14px; line-height: 1.5; }
-  .card { padding: 12px 10px; border-radius: 12px; }
+@media (max-width: 600px) {
 
-  /* ── URL submit form: stack vertically ── */
+  /* ── Shell ── */
+  .page  { padding: 12px 12px 24px; }
+  .hero  { margin-bottom: 12px; }
+  .hero h1 { font-size: 24px; letter-spacing: -0.3px; }
+  .hero p  { font-size: 13px; line-height: 1.5; }
+  .card  { padding: 12px; border-radius: 12px; }
+  .grid  { gap: 12px; margin-top: 12px; }
+
+  /* ── Lang toggle ── */
+  .lang-btn { padding: 5px 11px; font-size: 12px; }
+
+  /* ── Touch targets: 44 px minimum (Apple HIG) ── */
+  button { min-height: 44px; padding: 10px 14px; border-radius: 10px; }
+  .icon-btn { width: 38px; height: 38px; }
+  .icon-btn svg { width: 17px; height: 17px; }
+
+  /* ── URL submit: stack button below input ── */
   .url-form:not(.chat-form) {
     flex-direction: column;
     gap: 8px;
   }
   .url-form:not(.chat-form) button {
     width: 100%;
-    text-align: center;
+    justify-content: center;
   }
 
-  /* ── Larger touch targets ── */
-  button { min-height: 40px; }
-  .icon-btn { width: 36px; height: 36px; }
-  .icon-btn svg { width: 17px; height: 17px; }
+  /* ── Chat form: keep horizontal, shrink button ── */
+  .chat-form { gap: 8px; }
+  .chat-form button { min-width: 52px; min-height: 40px; padding: 8px 10px; font-size: 14px; }
+  .chat-form input  { font-size: 16px; } /* 16px prevents iOS auto-zoom */
 
   /* ── Backend error banner: stack ── */
-  .backend-error-banner {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 8px;
-  }
-  .backend-error-banner button { align-self: stretch; text-align: center; }
+  .backend-error-banner { flex-direction: column; align-items: stretch; gap: 8px; }
+  .backend-error-banner span { flex: 1; }
+  .backend-error-banner button { text-align: center; }
 
-  /* ── Library: card layout (table → visual cards) ── */
-  .library-panel-subtitle { display: none; } /* save vertical space */
-  .library-table-wrap  { overflow-x: unset; }
+  /* ── Library: replace table with card layout ── */
+  .library-panel-subtitle { display: none; }
+  .library-table-wrap     { overflow-x: unset; }
   .library-table,
-  .library-table tbody  { display: block; }
-  .library-table thead  { display: none; }    /* hide column headers */
+  .library-table tbody    { display: block; width: 100%; }
+  .library-table thead    { display: none; }
 
   .library-table tr {
     display: grid;
     grid-template-columns: 1fr auto;
     grid-template-rows: auto auto;
-    gap: 4px 10px;
+    column-gap: 8px;
+    row-gap: 6px;
     border: 1px solid #e2e8f0;
     border-radius: 12px;
     padding: 10px 12px;
     margin-bottom: 8px;
     background: #fff;
+    width: 100%;
   }
   .library-row-active { background: #eef2ff !important; border-color: #c7d2fe; }
 
   .library-table td {
+    display: block;
     border: none;
     padding: 0;
-    vertical-align: middle;
   }
 
-  /* Column 1 — Title: row 1, col 1, full bold */
+  /* Col 1 — Title (row 1, col 1) */
   .library-table td:nth-child(1) {
     grid-row: 1; grid-column: 1;
-    font-weight: 600;
-    font-size: 14px;
-    overflow: hidden;
-    min-width: 0;
+    font-size: 14px; font-weight: 600;
   }
-  /* Column 2 — Saved as: hidden */
+  /* Col 2 — Saved as: hidden */
   .library-table td:nth-child(2) { display: none; }
-  /* Column 3 — Status: row 1, col 2 */
+  /* Col 3 — Status badge (row 1, col 2) */
   .library-table td:nth-child(3) {
     grid-row: 1; grid-column: 2;
-    display: flex;
-    align-items: center;
-    justify-content: flex-end;
+    display: flex; align-items: center; justify-content: flex-end;
   }
-  /* Column 4 — Date: row 2, col 1 */
+  /* Col 4 — Date (row 2, col 1) */
   .library-table td:nth-child(4) {
     grid-row: 2; grid-column: 1;
-    font-size: 12px;
-    color: #64748b;
-    white-space: nowrap;
-    display: flex;
-    align-items: center;
+    font-size: 12px; color: #64748b;
+    white-space: normal;
+    display: flex; align-items: center;
   }
-  /* Column 5 — Actions: row 2, col 2 */
+  /* Col 5 — Action buttons (row 2, col 2) */
   .library-table td:nth-child(5) {
     grid-row: 2; grid-column: 2;
-    display: flex;
-    justify-content: flex-end;
+    display: flex; align-items: center; justify-content: flex-end;
   }
 
-  .library-group + .library-group { margin-top: 14px; }
+  .library-group + .library-group { margin-top: 12px; }
+  .library-group h4 { font-size: 12px; }
 
-  /* ── Video player: full width, cap height ── */
-  .video-player { max-width: 100%; max-height: 55vh; object-fit: contain; }
+  /* ── Video / media ── */
+  .video-player { max-width: 100%; max-height: 52vw; }
   .thumbnail    { max-width: 100%; }
 
-  /* ── Chat panel ── */
-  .chat-box { max-height: 260px; min-height: 160px; }
+  /* ── Chat ── */
+  .chat-box { max-height: 240px; min-height: 140px; }
   .chat-mode-btn { padding: 6px 10px; font-size: 12px; }
-  .chat-form input  { font-size: 14px; }
-  .chat-form button { min-width: 56px; padding: 10px 10px; min-height: 40px; }
+  .chat-message { padding: 8px 10px; }
 
-  /* ── Notes editor toolbar: horizontal scroll on mobile ── */
+  /* ── Notes editor: scrollable toolbar, compact body ── */
+  .notes-editor-wrap { border-radius: 10px; }
+
   .rte-toolbar {
     flex-wrap: nowrap;
     overflow-x: auto;
+    overflow-y: hidden;
     -webkit-overflow-scrolling: touch;
-    scrollbar-width: none;      /* Firefox */
-    padding-bottom: 8px;
+    scrollbar-width: none;
+    gap: 1px;
+    padding: 5px 8px 8px;  /* extra bottom padding for scrollbar room */
   }
-  .rte-toolbar::-webkit-scrollbar { display: none; }  /* Chrome/Safari */
+  .rte-toolbar::-webkit-scrollbar { display: none; }
 
-  .rte-btn { min-width: 28px; height: 26px; font-size: 12px; padding: 0 4px; }
-  .rte-select    { height: 26px; font-size: 11px; max-width: 88px; }
-  .rte-select-sm { max-width: 56px; }
-  .rte-sep  { height: 18px; }
+  .rte-btn        { min-width: 26px; height: 26px; font-size: 12px; padding: 0 3px; }
+  .rte-select     { height: 26px; font-size: 11px; max-width: 84px; padding: 0 4px; }
+  .rte-select-sm  { max-width: 54px; }
+  .rte-sep        { height: 16px; margin: 0 2px; }
 
-  /* Notes editor body */
-  .rte-body { min-height: 120px; }
-  .rte-body .ProseMirror {
-    min-height: 120px;
-    padding: 10px 12px;
-    font-size: 15px;
-  }
+  .rte-body       { min-height: 100px; }
+  .rte-body .ProseMirror { min-height: 100px; padding: 10px 12px; font-size: 15px; }
 
   /* ── Audio player ── */
-  .audio-player { padding: 8px 10px; }
-  .audio-player-header { padding: 8px 10px; }
-  .audio-download-btn { padding: 5px 10px; font-size: 12px; }
+  .audio-player-header { padding: 8px 12px; font-size: 13px; }
+  .audio-download-btn  { padding: 4px 10px; font-size: 12px; }
+  .audio-player        { padding: 8px 12px; }
 
-  /* ── Lang toggle: slightly smaller ── */
-  .lang-btn { padding: 5px 12px; font-size: 12px; }
+  /* ── Editor form ── */
+  .editor-form input,
+  .editor-form textarea { font-size: 16px; } /* prevent iOS zoom */
+
+  /* ── Detail section spacing ── */
+  .detail-actions { margin-top: 14px; padding-top: 14px; }
+  .video-editor   { margin-top: 16px; padding-top: 14px; }
 }

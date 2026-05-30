@@ -167,6 +167,13 @@ export const translations = {
     notificationReady: (title) => `✅ "${title}" is ready!`,
     notificationBody: 'Your video has been transcribed. You can now chat with it.',
 
+    // ── Library pagination & export ───────────────────────────────────────────
+    loadMore: 'Load more',
+    loadingMore: 'Loading…',
+    allLoaded: (n) => `All ${n} videos loaded`,
+    exportCsv: 'Export CSV',
+    exportCsvTitle: 'Download your library as a spreadsheet',
+
     // ── Processing steps ─────────────────────────────────────────────────────
     stepDownloading:  'Downloading video',
     stepExtracting:   'Extracting audio',
@@ -378,6 +385,13 @@ export const translations = {
     // ── Notification ─────────────────────────────────────────────────────────
     notificationReady: (title) => `✅ "${title}" جاهز!`,
     notificationBody: 'تم نسخ الفيديو الخاص بك. يمكنك الآن التحدث معه.',
+
+    // ── Library pagination & export ───────────────────────────────────────────
+    loadMore: 'تحميل المزيد',
+    loadingMore: 'جارٍ التحميل…',
+    allLoaded: (n) => `تم تحميل جميع ${n} مقاطع`,
+    exportCsv: 'تصدير CSV',
+    exportCsvTitle: 'تحميل مكتبتك كجدول بيانات',
 
     // ── Processing steps ─────────────────────────────────────────────────────
     stepDownloading:  'تحميل الفيديو',

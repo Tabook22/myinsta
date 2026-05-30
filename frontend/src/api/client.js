@@ -81,8 +81,39 @@ export function getVideo(videoId) {
   return request(`/api/videos/${videoId}`)
 }
 
+/** Returns all videos (legacy — used for backward compat, loads first page only) */
 export function listVideos() {
-  return request('/api/videos')
+  return request('/api/videos?limit=20&offset=0')
+}
+
+/** Paginated list — returns { items, total, hasMore } */
+export async function listVideosPaginated(limit = 20, offset = 0) {
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
+  let response
+  try {
+    response = await fetch(`${API_BASE_URL}/api/videos?limit=${limit}&offset=${offset}`, {
+      headers: { 'Content-Type': 'application/json' },
+      signal: controller.signal,
+    })
+  } catch (err) {
+    if (err.name === 'AbortError') throw new Error('Server is not responding — please check back in a moment.')
+    throw new Error('Cannot reach server — check your connection.')
+  } finally {
+    clearTimeout(timer)
+  }
+  if (!response.ok) {
+    const text = await response.text()
+    throw new Error(parseErrorMessage(text) || `Request failed with status ${response.status}`)
+  }
+  const items = await response.json()
+  const total = parseInt(response.headers.get('X-Total-Count') || '0', 10)
+  return { items, total, hasMore: offset + items.length < total }
+}
+
+/** URL for direct CSV download (no JS needed — browser handles it) */
+export function getExportUrl() {
+  return `${API_BASE_URL}/api/videos/export`
 }
 
 export function updateVideo(videoId, payload) {

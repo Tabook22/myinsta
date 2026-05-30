@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 
-import { createVideo, getVideo, listVideos } from '../api/client.js'
+import { createVideo, getVideo, listVideosPaginated } from '../api/client.js'
 import { useLanguage } from '../context/LanguageContext.jsx'
 import { useTheme } from '../context/ThemeContext.jsx'
 import ChatPanel from '../components/ChatPanel.jsx'
@@ -94,7 +94,13 @@ function ThemeToggle() {
 export default function HomePage() {
   const { t } = useLanguage()
   const [video, setVideo]               = useState(null)
-  const [recentVideos, setRecentVideos] = useState([])
+  const [recentVideos, setRecentVideos]   = useState([])
+  const [totalVideos,  setTotalVideos]    = useState(0)
+  const [hasMore,      setHasMore]        = useState(false)
+  const [isLoadingMore, setIsLoadingMore] = useState(false)
+  const offsetRef = useRef(0)
+  const PAGE_SIZE = 20
+
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [showEditor, setShowEditor]     = useState(false)
   const [error, setError]               = useState('')
@@ -107,14 +113,40 @@ export default function HomePage() {
   const prevStatus  = useRef(null)  // track status changes for notifications
 
   async function loadRecentVideos() {
+    // Reset to first page
+    offsetRef.current = 0
     try {
-      const videos = await listVideos()
-      setRecentVideos(videos)
+      const { items, total, hasMore: more } = await listVideosPaginated(PAGE_SIZE, 0)
+      setRecentVideos(items)
+      setTotalVideos(total)
+      setHasMore(more)
+      offsetRef.current = items.length
       setBackendError('')
     } catch (err) {
       setBackendError(err.message)
     } finally {
       setLoadingLibrary(false)
+    }
+  }
+
+  async function loadMoreVideos() {
+    if (isLoadingMore || !hasMore) return
+    setIsLoadingMore(true)
+    try {
+      const { items, total, hasMore: more } = await listVideosPaginated(PAGE_SIZE, offsetRef.current)
+      setRecentVideos((prev) => {
+        // Avoid duplicates (in case a new video was added between loads)
+        const existingIds = new Set(prev.map((v) => v.id))
+        const fresh = items.filter((v) => !existingIds.has(v.id))
+        return [...prev, ...fresh]
+      })
+      setTotalVideos(total)
+      setHasMore(more)
+      offsetRef.current += items.length
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setIsLoadingMore(false)
     }
   }
 
@@ -269,6 +301,10 @@ export default function HomePage() {
       ) : (
         <VideoLibrary
           videos={recentVideos}
+          totalVideos={totalVideos}
+          hasMore={hasMore}
+          isLoadingMore={isLoadingMore}
+          onLoadMore={loadMoreVideos}
           selectedId={video?.id}
           onView={(videoId) => openVideo(videoId, { edit: false })}
           onEdit={(videoId) => openVideo(videoId, { edit: true })}

@@ -1,8 +1,10 @@
+import csv
+import io
 import json
 import mimetypes
 from pathlib import Path
 
-from fastapi import APIRouter, BackgroundTasks, HTTPException
+from fastapi import APIRouter, BackgroundTasks, HTTPException, Response
 from fastapi.responses import FileResponse
 
 from app.core.config import settings
@@ -17,6 +19,7 @@ from app.models.video import (
     VideoUpdateRequest,
 )
 from app.services.audio_extractor import extract_audio, extract_audio_mp3
+from app.services.video_compressor import compress_video
 from app.services.chat_service import answer_from_transcript
 from app.services.web_search import search_web
 from app.services.library_storage import (
@@ -121,6 +124,12 @@ def process_video(video_id: int) -> None:
             settings.download_path,
             video_id,
         )
+
+        # Optional compression (large files only — silently skipped on failure)
+        try:
+            compress_video(Path(download_result["local_video_path"]))
+        except Exception:
+            pass
 
         # Mark: extracting audio
         with get_connection() as conn:
@@ -231,12 +240,69 @@ def create_video(payload: VideoCreateRequest, background_tasks: BackgroundTasks)
 
 
 @router.get("", response_model=list[VideoResponse])
-def list_videos() -> list[VideoResponse]:
+def list_videos(
+    response: Response,
+    limit: int = 20,
+    offset: int = 0,
+) -> list[VideoResponse]:
+    with get_connection() as conn:
+        total = conn.execute(
+            "SELECT COUNT(*) FROM videos WHERE deleted_at IS NULL"
+        ).fetchone()[0]
+        rows = conn.execute(
+            "SELECT * FROM videos WHERE deleted_at IS NULL "
+            "ORDER BY created_at DESC LIMIT ? OFFSET ?",
+            (limit, offset),
+        ).fetchall()
+    response.headers["X-Total-Count"] = str(total)
+    return [_row_to_video_response(row) for row in rows]
+
+
+@router.get("/export")
+def export_videos() -> Response:
+    """Download the entire active library as a CSV file."""
     with get_connection() as conn:
         rows = conn.execute(
-            "SELECT * FROM videos WHERE deleted_at IS NULL ORDER BY created_at DESC LIMIT 100"
+            """
+            SELECT v.id, v.title, v.uploader, v.duration_seconds, v.status,
+                   v.tags, v.created_at, v.source_url, v.creator_url, t.full_text
+            FROM videos v
+            LEFT JOIN transcripts t ON v.id = t.video_id
+            WHERE v.deleted_at IS NULL
+            ORDER BY v.created_at DESC
+            """
         ).fetchall()
-        return [_row_to_video_response(row) for row in rows]
+
+    buf = io.StringIO()
+    writer = csv.writer(buf)
+    writer.writerow([
+        "ID", "Title", "Creator", "Duration", "Status",
+        "Tags", "Date", "Source URL", "Transcript Preview",
+    ])
+
+    for row in rows:
+        tags    = ", ".join(json.loads(row["tags"])) if row["tags"] else ""
+        text    = row["full_text"] or ""
+        preview = (text[:200] + "…") if len(text) > 200 else text
+        secs    = row["duration_seconds"] or 0
+        dur     = f"{int(secs // 60)}:{int(secs % 60):02d}" if secs else ""
+        writer.writerow([
+            row["id"],
+            row["title"] or "",
+            row["uploader"] or "",
+            dur,
+            row["status"],
+            tags,
+            row["created_at"],
+            row["source_url"],
+            preview,
+        ])
+
+    return Response(
+        content=buf.getvalue(),
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": 'attachment; filename="myinsta-library.csv"'},
+    )
 
 
 @router.get("/stats")

@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { deleteVideo, listTrash, permanentDeleteVideo, restoreVideo, updateVideo } from '../api/client.js'
+import { deleteVideo, getExportUrl, listTrash, permanentDeleteVideo, restoreVideo, updateVideo } from '../api/client.js'
 import { useLanguage } from '../context/LanguageContext.jsx'
 
 // ── Shared helpers ────────────────────────────────────────────────────────────
@@ -185,7 +185,10 @@ function RowActions({ item, onView, onEdit, onDelete, t }) {
 }
 
 // ── Main component ────────────────────────────────────────────────────────────
-export default function VideoLibrary({ videos, selectedId, onView, onEdit, onDeleted, onRefresh }) {
+export default function VideoLibrary({
+  videos, totalVideos = 0, hasMore = false, isLoadingMore = false,
+  onLoadMore, selectedId, onView, onEdit, onDeleted, onRefresh,
+}) {
   const { t, lang } = useLanguage()
   const locale = lang === 'ar' ? 'ar-SA' : 'en-US'
 
@@ -323,6 +326,20 @@ export default function VideoLibrary({ videos, selectedId, onView, onEdit, onDel
           </div>
 
           <div className="library-header-controls">
+            {/* Export CSV */}
+            {videos.length > 0 && (
+              <a href={getExportUrl()} download="myinsta-library.csv"
+                className="export-csv-btn" title={t('exportCsvTitle')}>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                  strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                  <polyline points="7 10 12 15 17 10"/>
+                  <line x1="12" y1="15" x2="12" y2="3"/>
+                </svg>
+                {t('exportCsv')}
+              </a>
+            )}
+
             {/* Sort dropdown */}
             <select
               className="lib-sort-select"
@@ -523,6 +540,20 @@ export default function VideoLibrary({ videos, selectedId, onView, onEdit, onDel
           </div>
         </div>
       ))}
+
+      {/* ── Load more / all-loaded indicator ── */}
+      {videos.length > 0 && (
+        <div className="load-more-row">
+          {hasMore ? (
+            <button type="button" className="load-more-btn"
+              onClick={onLoadMore} disabled={isLoadingMore}>
+              {isLoadingMore ? t('loadingMore') : t('loadMore')}
+            </button>
+          ) : (
+            <span className="all-loaded-label">{t('allLoaded', totalVideos)}</span>
+          )}
+        </div>
+      )}
 
       {/* ── Trash section ── */}
       <div className="trash-section">

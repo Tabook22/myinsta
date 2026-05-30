@@ -1292,6 +1292,232 @@ button:disabled {
   [data-theme="dark"] .library-table td:nth-child(4) { color: #64748b; }
 }
 
+/* ── Processing steps stepper ───────────────────────────────────────────── */
+.processing-steps {
+  display: flex;
+  align-items: flex-start;
+  gap: 0;
+  margin: 14px 0;
+  padding: 14px 16px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  position: relative;
+}
+
+.proc-step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+  position: relative;
+}
+
+/* Horizontal connector line between steps */
+.proc-line {
+  position: absolute;
+  top: 14px;
+  right: 50%;
+  width: 100%;
+  height: 2px;
+  background: #e2e8f0;
+  z-index: 0;
+}
+.proc-line-done { background: #4f46e5; }
+
+/* Circle indicator */
+.proc-circle {
+  width: 28px; height: 28px;
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  position: relative; z-index: 1;
+  flex-shrink: 0;
+  transition: background 0.3s, border-color 0.3s;
+}
+.proc-step-done .proc-circle {
+  background: #4f46e5;
+  border: 2px solid #4f46e5;
+}
+.proc-step-done .proc-circle svg {
+  width: 14px; height: 14px; color: #fff;
+}
+.proc-step-active .proc-circle {
+  background: #eef2ff;
+  border: 2px solid #4f46e5;
+}
+.proc-step-pending .proc-circle {
+  background: #fff;
+  border: 2px solid #e2e8f0;
+}
+.proc-num { font-size: 11px; font-weight: 700; color: #94a3b8; }
+
+/* Spinner inside active circle */
+.proc-spinner {
+  width: 12px; height: 12px;
+  border: 2px solid #c7d2fe;
+  border-top-color: #4f46e5;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  display: block;
+}
+
+/* Step label */
+.proc-label {
+  font-size: 11px;
+  font-weight: 600;
+  text-align: center;
+  line-height: 1.3;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+.proc-step-done .proc-label    { color: #4f46e5; }
+.proc-step-active .proc-label  { color: #4f46e5; }
+.proc-step-pending .proc-label { color: #94a3b8; }
+.proc-icon { font-size: 14px; }
+
+/* ── Video meta row (status + duration) ──────────────────────────────────── */
+.video-meta-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+.video-duration-badge {
+  font-size: 13px;
+  font-weight: 600;
+  color: #64748b;
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  border-radius: 999px;
+  padding: 3px 10px;
+}
+
+/* ── Creator card ────────────────────────────────────────────────────────── */
+.creator-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  margin-bottom: 14px;
+}
+.creator-avatar {
+  width: 42px; height: 42px;
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 18px; font-weight: 800;
+  color: #fff;
+  flex-shrink: 0;
+}
+.creator-card-info {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+.creator-card-name {
+  font-size: 14px;
+  font-weight: 700;
+  color: #0f172a;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.creator-card-name:hover { color: #4f46e5; text-decoration: underline; }
+.creator-card-name svg   { width: 12px; height: 12px; flex-shrink: 0; }
+.creator-card-count { font-size: 12px; color: #64748b; }
+
+/* ── Shortcuts modal ─────────────────────────────────────────────────────── */
+.shortcuts-hint-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px; height: 36px;
+  padding: 0;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #f8fafc;
+  color: #64748b;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+  flex-shrink: 0;
+  min-height: unset;
+}
+.shortcuts-hint-btn:hover { background: #eef2ff; color: #4f46e5; border-color: #c7d2fe; }
+
+.shortcuts-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgb(15 23 42 / 55%);
+  backdrop-filter: blur(3px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  padding: 16px;
+}
+.shortcuts-modal {
+  background: #fff;
+  border-radius: 16px;
+  padding: 24px;
+  width: 100%;
+  max-width: 420px;
+  box-shadow: 0 20px 60px rgb(15 23 42 / 20%);
+  animation: onboarding-in 0.2s ease;
+}
+.shortcuts-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 18px;
+}
+.shortcuts-header h2 { margin: 0; font-size: 18px; }
+.shortcuts-close {
+  background: none; border: none;
+  font-size: 18px; color: #94a3b8;
+  cursor: pointer; padding: 0 4px; min-height: unset;
+}
+.shortcuts-close:hover { color: #4f46e5; }
+
+.shortcuts-table { width: 100%; border-collapse: collapse; }
+.shortcuts-table tr + tr td { border-top: 1px solid #f1f5f9; }
+.shortcuts-table td { padding: 9px 6px; vertical-align: middle; }
+
+.shortcut-keys {
+  white-space: nowrap;
+  width: 1%;
+  padding-right: 16px !important;
+}
+kbd {
+  display: inline-block;
+  padding: 3px 7px;
+  font-size: 11px;
+  font-weight: 700;
+  font-family: ui-monospace, monospace;
+  background: #f1f5f9;
+  border: 1px solid #cbd5e1;
+  border-bottom-width: 2px;
+  border-radius: 5px;
+  color: #374151;
+}
+.shortcut-plus { margin: 0 3px; font-size: 11px; color: #94a3b8; }
+.shortcut-desc { font-size: 13px; color: #374151; }
+.shortcuts-tip {
+  margin: 16px 0 0;
+  font-size: 12px;
+  color: #94a3b8;
+  text-align: center;
+}
+
 /* ── Stats panel ─────────────────────────────────────────────────────────── */
 .stats-panel {
   display: flex;
@@ -1919,6 +2145,31 @@ button:disabled {
 [data-theme="dark"] .tag-input-wrap   { background: #0f172a; border-color: #475569; }
 [data-theme="dark"] .tag-filter-btn   { background: #1e293b; border-color: #334155; color: #94a3b8; }
 [data-theme="dark"] .tag-filter-btn:hover { background: #1e1b4b; color: #818cf8; border-color: #4f46e5; }
+
+/* Processing steps dark */
+[data-theme="dark"] .processing-steps       { background: #1e293b; border-color: #334155; }
+[data-theme="dark"] .proc-step-pending .proc-circle { background: #0f172a; border-color: #475569; }
+[data-theme="dark"] .proc-step-active .proc-circle  { background: #1e1b4b; border-color: #4f46e5; }
+[data-theme="dark"] .proc-line              { background: #334155; }
+[data-theme="dark"] .proc-num              { color: #475569; }
+[data-theme="dark"] .proc-step-pending .proc-label { color: #475569; }
+
+/* Video meta row dark */
+[data-theme="dark"] .video-duration-badge  { background: #1e293b; border-color: #334155; color: #64748b; }
+
+/* Creator card dark */
+[data-theme="dark"] .creator-card          { background: #1e293b; border-color: #334155; }
+[data-theme="dark"] .creator-card-name     { color: #e2e8f0; }
+[data-theme="dark"] .creator-card-count    { color: #64748b; }
+
+/* Shortcuts dark */
+[data-theme="dark"] .shortcuts-hint-btn    { background: #1e293b; color: #94a3b8; border-color: #334155; }
+[data-theme="dark"] .shortcuts-hint-btn:hover { background: #1e1b4b; color: #818cf8; border-color: #4f46e5; }
+[data-theme="dark"] .shortcuts-modal       { background: #1e293b; }
+[data-theme="dark"] .shortcuts-header h2   { color: #e2e8f0; }
+[data-theme="dark"] .shortcuts-table tr + tr td { border-color: #334155; }
+[data-theme="dark"] .shortcut-desc         { color: #cbd5e1; }
+[data-theme="dark"] kbd                    { background: #0f172a; border-color: #475569; color: #cbd5e1; }
 
 /* Library controls dark */
 [data-theme="dark"] .lib-sort-select  { background: #1e293b; border-color: #334155; color: #cbd5e1; }

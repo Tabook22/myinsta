@@ -46,6 +46,7 @@ class VideoResponse(BaseModel):
     notes: str | None = None
     tags: list[str] = []
     deleted_at: str | None = None
+    processing_step: str | None = None
     transcript: TranscriptResponse | None = None
     created_at: str
     updated_at: str

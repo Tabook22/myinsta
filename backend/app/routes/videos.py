@@ -80,6 +80,7 @@ def _row_to_video_response(row, transcript_row=None) -> VideoResponse:
         notes=row["notes"] if "notes" in row.keys() else None,
         tags=json.loads(row["tags"]) if row["tags"] else [],
         deleted_at=row["deleted_at"] if "deleted_at" in row.keys() else None,
+        processing_step=row["processing_step"] if "processing_step" in row.keys() else None,
         transcript=transcript,
         created_at=row["created_at"],
         updated_at=row["updated_at"],
@@ -111,8 +112,8 @@ def process_video(video_id: int) -> None:
                 return
             source_url = row["source_url"]
             conn.execute(
-                "UPDATE videos SET status = ? WHERE id = ?",
-                ("processing", video_id),
+                "UPDATE videos SET status = ?, processing_step = ? WHERE id = ?",
+                ("processing", "downloading", video_id),
             )
 
         download_result = download_video(
@@ -121,12 +122,27 @@ def process_video(video_id: int) -> None:
             video_id,
         )
 
+        # Mark: extracting audio
+        with get_connection() as conn:
+            conn.execute(
+                "UPDATE videos SET processing_step = ? WHERE id = ?",
+                ("extracting", video_id),
+            )
+
         video_path = Path(download_result["local_video_path"])
         audio_path = extract_audio(video_path, settings.audio_path)           # WAV for Whisper
         try:
             extract_audio_mp3(video_path, settings.audio_path)                # MP3 for playback
         except Exception:
             pass  # MP3 is optional — transcription still works without it
+
+        # Mark: transcribing
+        with get_connection() as conn:
+            conn.execute(
+                "UPDATE videos SET processing_step = ? WHERE id = ?",
+                ("transcribing", video_id),
+            )
+
         transcript_result = transcribe_audio(audio_path)
 
         content_type = detect_content_type(

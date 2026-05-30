@@ -5,6 +5,7 @@ import { useLanguage } from '../context/LanguageContext.jsx'
 import { useTheme } from '../context/ThemeContext.jsx'
 import ChatPanel from '../components/ChatPanel.jsx'
 import OnboardingModal, { shouldShowOnboarding, markOnboardingDone } from '../components/OnboardingModal.jsx'
+import ShortcutsModal from '../components/ShortcutsModal.jsx'
 import StatsPanel from '../components/StatsPanel.jsx'
 import TranscriptViewer from '../components/TranscriptViewer.jsx'
 import UrlSubmitForm from '../components/UrlSubmitForm.jsx'
@@ -100,6 +101,7 @@ export default function HomePage() {
   const [backendError, setBackendError] = useState('')
   const [loadingLibrary, setLoadingLibrary] = useState(true)
   const [showOnboarding, setShowOnboarding] = useState(shouldShowOnboarding)
+  const [showShortcuts, setShowShortcuts]   = useState(false)
   const [statsKey, setStatsKey]         = useState(0) // bump to re-fetch stats
   const detailRef   = useRef(null)
   const prevStatus  = useRef(null)  // track status changes for notifications
@@ -168,14 +170,24 @@ export default function HomePage() {
     setStatsKey((k) => k + 1)
   }
 
-  // Escape key: close the video editor panel when it's open
+  // Global keyboard shortcuts
   useEffect(() => {
     function onKeyDown(e) {
-      if (e.key === 'Escape' && showEditor) setShowEditor(false)
+      // ? → open shortcuts modal (only when not in an input/textarea)
+      if (e.key === '?' && !['INPUT','TEXTAREA'].includes(e.target.tagName)) {
+        e.preventDefault()
+        setShowShortcuts((prev) => !prev)
+        return
+      }
+      // Escape → close shortcuts modal or editor
+      if (e.key === 'Escape') {
+        if (showShortcuts) { setShowShortcuts(false); return }
+        if (showEditor)    { setShowEditor(false);    return }
+      }
     }
     document.addEventListener('keydown', onKeyDown)
     return () => document.removeEventListener('keydown', onKeyDown)
-  }, [showEditor])
+  }, [showEditor, showShortcuts])
 
   // Polling: refresh video status + fire notification when ready
   useEffect(() => {
@@ -206,9 +218,12 @@ export default function HomePage() {
 
   return (
     <main className="page">
-      {/* Onboarding modal — shows only on first visit */}
+      {/* Modals */}
       {showOnboarding && (
         <OnboardingModal onDone={() => setShowOnboarding(false)} />
+      )}
+      {showShortcuts && (
+        <ShortcutsModal onClose={() => setShowShortcuts(false)} />
       )}
 
       {/* ── Hero ── */}
@@ -219,6 +234,12 @@ export default function HomePage() {
             <p>{t('appSubtitle')}</p>
           </div>
           <div className="hero-controls">
+            <button type="button" className="shortcuts-hint-btn"
+              onClick={() => setShowShortcuts(true)}
+              title={t('shortcutsTitle')}
+              aria-label={t('shortcutsTitle')}>
+              ?
+            </button>
             <ThemeToggle />
             <LanguageToggle />
           </div>
@@ -259,7 +280,7 @@ export default function HomePage() {
       {video ? (
         <section className="grid" ref={detailRef}>
           <div className="card">
-            <VideoDetails video={video} />
+            <VideoDetails video={video} allVideos={recentVideos} />
             <TranscriptViewer status={video.status} transcript={video.transcript} />
             {showEditor ? (
               <VideoEditor

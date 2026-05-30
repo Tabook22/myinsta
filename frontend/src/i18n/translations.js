@@ -167,6 +167,24 @@ export const translations = {
     notificationReady: (title) => `✅ "${title}" is ready!`,
     notificationBody: 'Your video has been transcribed. You can now chat with it.',
 
+    // ── Processing steps ─────────────────────────────────────────────────────
+    stepDownloading:  'Downloading video',
+    stepExtracting:   'Extracting audio',
+    stepTranscribing: 'Transcribing',
+
+    // ── Creator card ──────────────────────────────────────────────────────────
+    creatorVideoCount: (n) => `${n} video${n === 1 ? '' : 's'} saved from this creator`,
+
+    // ── Keyboard shortcuts ────────────────────────────────────────────────────
+    shortcutsTitle:   'Keyboard Shortcuts',
+    shortcutsTip:     'Press ? anytime to show this panel',
+    shortcutHelp:     'Show keyboard shortcuts',
+    shortcutSaveNotes:'Save notes immediately',
+    shortcutSendChat: 'Send chat message',
+    shortcutEscape:   'Close editor / close this panel',
+    shortcutUndo:     'Undo (in notes editor)',
+    shortcutRedo:     'Redo (in notes editor)',
+
     // ── Library view & sort ───────────────────────────────────────────────────
     viewList: 'List',
     viewGrid: 'Grid',
@@ -360,6 +378,24 @@ export const translations = {
     // ── Notification ─────────────────────────────────────────────────────────
     notificationReady: (title) => `✅ "${title}" جاهز!`,
     notificationBody: 'تم نسخ الفيديو الخاص بك. يمكنك الآن التحدث معه.',
+
+    // ── Processing steps ─────────────────────────────────────────────────────
+    stepDownloading:  'تحميل الفيديو',
+    stepExtracting:   'استخراج الصوت',
+    stepTranscribing: 'النسخ إلى نص',
+
+    // ── Creator card ──────────────────────────────────────────────────────────
+    creatorVideoCount: (n) => `${n} فيديو محفوظ من هذا المبدع`,
+
+    // ── Keyboard shortcuts ────────────────────────────────────────────────────
+    shortcutsTitle:   'اختصارات لوحة المفاتيح',
+    shortcutsTip:     'اضغط ? في أي وقت لعرض هذه اللوحة',
+    shortcutHelp:     'عرض اختصارات لوحة المفاتيح',
+    shortcutSaveNotes:'حفظ الملاحظات فوراً',
+    shortcutSendChat: 'إرسال رسالة الدردشة',
+    shortcutEscape:   'إغلاق المحرر / إغلاق هذه اللوحة',
+    shortcutUndo:     'تراجع (في محرر الملاحظات)',
+    shortcutRedo:     'إعادة (في محرر الملاحظات)',
 
     // ── Library view & sort ───────────────────────────────────────────────────
     viewList: 'قائمة',

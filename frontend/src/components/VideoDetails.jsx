@@ -1,10 +1,72 @@
 import { useLanguage } from '../context/LanguageContext.jsx'
 import AudioPlayer from './AudioPlayer.jsx'
 import NotesEditor from './NotesEditor.jsx'
+import ProcessingSteps from './ProcessingSteps.jsx'
 import VideoPlayer from './VideoPlayer.jsx'
 
-export default function VideoDetails({ video }) {
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function formatDuration(seconds) {
+  if (!seconds) return null
+  const h = Math.floor(seconds / 3600)
+  const m = Math.floor((seconds % 3600) / 60)
+  const s = Math.round(seconds % 60)
+  if (h > 0) return `${h}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`
+  return `${m}:${s.toString().padStart(2, '0')}`
+}
+
+const AVATAR_COLORS = [
+  '#4f46e5','#0891b2','#16a34a','#ca8a04',
+  '#7c3aed','#0284c7','#be185d','#dc2626',
+]
+function avatarColor(name) {
+  let h = 0
+  for (const c of name) h = c.charCodeAt(0) + ((h << 5) - h)
+  return AVATAR_COLORS[Math.abs(h) % AVATAR_COLORS.length]
+}
+
+// ── Creator card ──────────────────────────────────────────────────────────────
+function CreatorCard({ video, allVideos }) {
   const { t } = useLanguage()
+  if (!video.uploader) return null
+
+  const count = allVideos.filter(
+    (v) => v.uploader === video.uploader && !v.deleted_at
+  ).length
+  const initial = video.uploader.charAt(0).toUpperCase()
+  const color   = avatarColor(video.uploader)
+
+  return (
+    <div className="creator-card">
+      <div className="creator-avatar" style={{ background: color }}>
+        {initial}
+      </div>
+      <div className="creator-card-info">
+        {video.creator_url ? (
+          <a href={video.creator_url} target="_blank" rel="noreferrer"
+            className="creator-card-name">
+            @{video.uploader}
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+              stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
+              <polyline points="15 3 21 3 21 9"/>
+              <line x1="10" y1="14" x2="21" y2="3"/>
+            </svg>
+          </a>
+        ) : (
+          <span className="creator-card-name">@{video.uploader}</span>
+        )}
+        <span className="creator-card-count">
+          {t('creatorVideoCount', count)}
+        </span>
+      </div>
+    </div>
+  )
+}
+
+// ── Main component ────────────────────────────────────────────────────────────
+export default function VideoDetails({ video, allVideos = [] }) {
+  const { t } = useLanguage()
+  const duration = formatDuration(video.duration_seconds)
 
   return (
     <section>
@@ -12,11 +74,25 @@ export default function VideoDetails({ video }) {
       <AudioPlayer video={video} />
 
       {!video.video_url && video.thumbnail_url ? (
-        <img className="thumbnail" src={video.thumbnail_url} alt={video.title || t('untitledVideo')} />
+        <img className="thumbnail" src={video.thumbnail_url}
+          alt={video.title || t('untitledVideo')} />
       ) : null}
 
       <h2>{video.title || t('untitledVideo')}</h2>
-      <p><span className="status">{video.status}</span></p>
+
+      {/* Status + duration inline */}
+      <div className="video-meta-row">
+        <span className="status">{video.status}</span>
+        {duration && (
+          <span className="video-duration-badge">⏱ {duration}</span>
+        )}
+      </div>
+
+      {/* Processing step stepper */}
+      <ProcessingSteps video={video} />
+
+      {/* Creator card */}
+      <CreatorCard video={video} allVideos={allVideos} />
 
       {video.storage_stamp ? (
         <p><strong>{t('labelSavedAs')}</strong> {video.storage_stamp}</p>
@@ -30,26 +106,6 @@ export default function VideoDetails({ video }) {
         <a href={video.source_url} target="_blank" rel="noreferrer">{t('openOriginal')}</a>
       </p>
 
-      {video.uploader ? (
-        <p>
-          <strong>{t('labelCreator')}</strong>{' '}
-          {video.creator_url ? (
-            <a href={video.creator_url} target="_blank" rel="noreferrer" className="creator-link">
-              {video.uploader}
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
-                stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
-                <polyline points="15 3 21 3 21 9"/>
-                <line x1="10" y1="14" x2="21" y2="3"/>
-              </svg>
-            </a>
-          ) : video.uploader}
-        </p>
-      ) : null}
-
-      {video.duration_seconds ? (
-        <p><strong>{t('labelDuration')}</strong> {Math.round(video.duration_seconds)} {t('seconds')}</p>
-      ) : null}
       {video.description ? (
         <p><strong>{t('labelDescription')}</strong> {video.description}</p>
       ) : null}

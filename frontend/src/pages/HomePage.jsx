@@ -252,6 +252,7 @@ export default function HomePage() {
           onView={(videoId) => openVideo(videoId, { edit: false })}
           onEdit={(videoId) => openVideo(videoId, { edit: true })}
           onDeleted={handleVideoDeleted}
+          onRefresh={loadRecentVideos}
         />
       )}
 

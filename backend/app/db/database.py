@@ -13,6 +13,7 @@ MIGRATIONS = [
     "ALTER TABLE videos ADD COLUMN creator_url TEXT",
     "ALTER TABLE videos ADD COLUMN notes TEXT",
     "ALTER TABLE videos ADD COLUMN tags TEXT",         # JSON array of tag strings
+    "ALTER TABLE videos ADD COLUMN deleted_at TEXT",   # NULL = active, timestamp = soft-deleted
 ]
 
 

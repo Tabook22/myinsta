@@ -112,3 +112,15 @@ export function getChatHistory(videoId) {
 export function getStats() {
   return request('/api/videos/stats')
 }
+
+export function listTrash() {
+  return request('/api/videos/trash')
+}
+
+export function restoreVideo(videoId) {
+  return request(`/api/videos/${videoId}/restore`, { method: 'POST' })
+}
+
+export function permanentDeleteVideo(videoId) {
+  return request(`/api/videos/${videoId}/permanent`, { method: 'DELETE' })
+}

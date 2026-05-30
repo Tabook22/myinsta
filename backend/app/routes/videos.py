@@ -79,6 +79,7 @@ def _row_to_video_response(row, transcript_row=None) -> VideoResponse:
         audio_url=audio_url,
         notes=row["notes"] if "notes" in row.keys() else None,
         tags=json.loads(row["tags"]) if row["tags"] else [],
+        deleted_at=row["deleted_at"] if "deleted_at" in row.keys() else None,
         transcript=transcript,
         created_at=row["created_at"],
         updated_at=row["updated_at"],
@@ -216,7 +217,9 @@ def create_video(payload: VideoCreateRequest, background_tasks: BackgroundTasks)
 @router.get("", response_model=list[VideoResponse])
 def list_videos() -> list[VideoResponse]:
     with get_connection() as conn:
-        rows = conn.execute("SELECT * FROM videos ORDER BY created_at DESC LIMIT 100").fetchall()
+        rows = conn.execute(
+            "SELECT * FROM videos WHERE deleted_at IS NULL ORDER BY created_at DESC LIMIT 100"
+        ).fetchall()
         return [_row_to_video_response(row) for row in rows]
 
 
@@ -237,10 +240,62 @@ def get_stats() -> dict:
     }
 
 
+@router.get("/trash", response_model=list[VideoResponse])
+def list_trash() -> list[VideoResponse]:
+    """Return soft-deleted videos from the last 30 days. Purge older items."""
+    with get_connection() as conn:
+        # Purge items older than 30 days — delete files + DB record
+        expired = conn.execute(
+            "SELECT storage_folder FROM videos WHERE deleted_at IS NOT NULL "
+            "AND deleted_at < datetime('now', '-30 days')"
+        ).fetchall()
+        for row in expired:
+            delete_library_folder(settings.library_path, row["storage_folder"])
+        conn.execute(
+            "DELETE FROM videos WHERE deleted_at IS NOT NULL "
+            "AND deleted_at < datetime('now', '-30 days')"
+        )
+        # Return remaining trash (last 30 days)
+        rows = conn.execute(
+            "SELECT * FROM videos WHERE deleted_at IS NOT NULL ORDER BY deleted_at DESC"
+        ).fetchall()
+        return [_row_to_video_response(row) for row in rows]
+
+
+@router.post("/{video_id}/restore", response_model=VideoResponse)
+def restore_video(video_id: int) -> VideoResponse:
+    """Restore a soft-deleted video back to the active library."""
+    with get_connection() as conn:
+        row = conn.execute(
+            "SELECT * FROM videos WHERE id = ? AND deleted_at IS NOT NULL", (video_id,)
+        ).fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="Video not found in trash")
+        conn.execute("UPDATE videos SET deleted_at = NULL WHERE id = ?", (video_id,))
+    return get_video(video_id)
+
+
+@router.delete("/{video_id}/permanent", status_code=204)
+def permanent_delete_video(video_id: int) -> None:
+    """Permanently delete a trashed video and remove all its files."""
+    with get_connection() as conn:
+        row = conn.execute(
+            "SELECT storage_folder FROM videos WHERE id = ? AND deleted_at IS NOT NULL",
+            (video_id,),
+        ).fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="Video not found in trash")
+        storage_folder = row["storage_folder"]
+        conn.execute("DELETE FROM videos WHERE id = ?", (video_id,))
+    delete_library_folder(settings.library_path, storage_folder)
+
+
 @router.get("/{video_id}", response_model=VideoResponse)
 def get_video(video_id: int) -> VideoResponse:
     with get_connection() as conn:
-        row = conn.execute("SELECT * FROM videos WHERE id = ?", (video_id,)).fetchone()
+        row = conn.execute(
+            "SELECT * FROM videos WHERE id = ? AND deleted_at IS NULL", (video_id,)
+        ).fetchone()
         if not row:
             raise HTTPException(status_code=404, detail="Video not found")
         transcript_row = conn.execute(
@@ -307,14 +362,16 @@ def update_video(video_id: int, payload: VideoUpdateRequest) -> VideoResponse:
 
 @router.delete("/{video_id}", status_code=204)
 def delete_video(video_id: int) -> None:
+    """Soft-delete: move to trash. Files are kept for 30-day recovery window."""
     with get_connection() as conn:
-        row = conn.execute("SELECT storage_folder FROM videos WHERE id = ?", (video_id,)).fetchone()
+        row = conn.execute(
+            "SELECT id FROM videos WHERE id = ? AND deleted_at IS NULL", (video_id,)
+        ).fetchone()
         if not row:
             raise HTTPException(status_code=404, detail="Video not found")
-        storage_folder = row["storage_folder"]
-        conn.execute("DELETE FROM videos WHERE id = ?", (video_id,))
-
-    delete_library_folder(settings.library_path, storage_folder)
+        conn.execute(
+            "UPDATE videos SET deleted_at = datetime('now') WHERE id = ?", (video_id,)
+        )
 
 
 @router.get("/{video_id}/stream")

@@ -166,6 +166,36 @@ export const translations = {
     // ── Notification ─────────────────────────────────────────────────────────
     notificationReady: (title) => `✅ "${title}" is ready!`,
     notificationBody: 'Your video has been transcribed. You can now chat with it.',
+
+    // ── Library view & sort ───────────────────────────────────────────────────
+    viewList: 'List',
+    viewGrid: 'Grid',
+    sortLabel: 'Sort',
+    sortNewest: 'Newest first',
+    sortOldest: 'Oldest first',
+    sortDuration: 'Longest first',
+    sortTitleAZ: 'Title A–Z',
+    sortTitleZA: 'Title Z–A',
+
+    // ── Batch operations ──────────────────────────────────────────────────────
+    selectAll: 'Select all',
+    deselectAll: 'Deselect all',
+    selectedCount: (n) => `${n} selected`,
+    batchDelete: 'Move to trash',
+    batchAddTag: '+ Tag',
+    batchTagApply: 'Apply',
+    batchDeleteConfirm: (n) => `Move ${n} video${n === 1 ? '' : 's'} to trash?`,
+
+    // ── Trash ─────────────────────────────────────────────────────────────────
+    trash: 'Trash',
+    trashEmpty: 'Trash is empty',
+    trashNotice: 'Items are permanently deleted after 30 days',
+    trashDaysLeft: (n) => `${n}d left`,
+    restore: 'Restore',
+    deleteForever: 'Delete forever',
+    deleteForeverConfirm: 'Delete forever? This cannot be undone.',
+    emptyTrash: 'Empty trash',
+    emptyTrashConfirm: 'Permanently delete all items in trash?',
   },
 
   ar: {
@@ -330,5 +360,35 @@ export const translations = {
     // ── Notification ─────────────────────────────────────────────────────────
     notificationReady: (title) => `✅ "${title}" جاهز!`,
     notificationBody: 'تم نسخ الفيديو الخاص بك. يمكنك الآن التحدث معه.',
+
+    // ── Library view & sort ───────────────────────────────────────────────────
+    viewList: 'قائمة',
+    viewGrid: 'شبكة',
+    sortLabel: 'ترتيب',
+    sortNewest: 'الأحدث أولاً',
+    sortOldest: 'الأقدم أولاً',
+    sortDuration: 'الأطول أولاً',
+    sortTitleAZ: 'العنوان أ–ي',
+    sortTitleZA: 'العنوان ي–أ',
+
+    // ── Batch operations ──────────────────────────────────────────────────────
+    selectAll: 'تحديد الكل',
+    deselectAll: 'إلغاء التحديد',
+    selectedCount: (n) => `${n} محدد`,
+    batchDelete: 'نقل إلى المهملات',
+    batchAddTag: '+ وسم',
+    batchTagApply: 'تطبيق',
+    batchDeleteConfirm: (n) => `نقل ${n} فيديو إلى المهملات؟`,
+
+    // ── Trash ─────────────────────────────────────────────────────────────────
+    trash: 'المهملات',
+    trashEmpty: 'المهملات فارغة',
+    trashNotice: 'تُحذف العناصر نهائياً بعد 30 يوماً',
+    trashDaysLeft: (n) => `${n} يوم متبقٍ`,
+    restore: 'استعادة',
+    deleteForever: 'حذف نهائي',
+    deleteForeverConfirm: 'هل تريد الحذف النهائي؟ لا يمكن التراجع.',
+    emptyTrash: 'إفراغ المهملات',
+    emptyTrashConfirm: 'حذف جميع العناصر في المهملات نهائياً؟',
   },
 }

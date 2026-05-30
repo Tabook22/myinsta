@@ -1,6 +1,8 @@
 import { useState } from 'react'
+import { useLanguage } from '../context/LanguageContext.jsx'
 
 export default function UrlSubmitForm({ onSubmit, isSubmitting }) {
+  const { t } = useLanguage()
   const [url, setUrl] = useState('')
 
   function handleSubmit(event) {
@@ -13,13 +15,13 @@ export default function UrlSubmitForm({ onSubmit, isSubmitting }) {
     <form className="url-form" onSubmit={handleSubmit}>
       <input
         type="url"
-        placeholder="https://www.instagram.com/reel/..."
+        placeholder={t('urlPlaceholder')}
         value={url}
         onChange={(event) => setUrl(event.target.value)}
         required
       />
       <button type="submit" disabled={isSubmitting}>
-        {isSubmitting ? 'Submitting...' : 'Process video'}
+        {isSubmitting ? t('submitting') : t('processVideo')}
       </button>
     </form>
   )

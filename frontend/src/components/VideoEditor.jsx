@@ -1,14 +1,15 @@
 import { useEffect, useState } from 'react'
-
 import { deleteVideo, updateVideo } from '../api/client.js'
+import { useLanguage } from '../context/LanguageContext.jsx'
 
 export default function VideoEditor({ video, onUpdated, onDeleted }) {
-  const [title, setTitle] = useState(video.title || '')
-  const [description, setDescription] = useState(video.description || '')
+  const { t } = useLanguage()
+  const [title, setTitle]               = useState(video.title || '')
+  const [description, setDescription]   = useState(video.description || '')
   const [transcriptText, setTranscriptText] = useState(video.transcript?.full_text || '')
-  const [isSaving, setIsSaving] = useState(false)
-  const [isDeleting, setIsDeleting] = useState(false)
-  const [error, setError] = useState('')
+  const [isSaving, setIsSaving]         = useState(false)
+  const [isDeleting, setIsDeleting]     = useState(false)
+  const [error, setError]               = useState('')
 
   useEffect(() => {
     setTitle(video.title || '')
@@ -36,11 +37,8 @@ export default function VideoEditor({ video, onUpdated, onDeleted }) {
   }
 
   async function handleDelete() {
-    const label = video.title || video.storage_stamp || `Video #${video.id}`
-    if (!window.confirm(`Delete "${label}" and all saved files?`)) {
-      return
-    }
-
+    const label = video.title || video.storage_stamp || t('videoHash', video.id)
+    if (!window.confirm(t('deleteConfirm', label))) return
     setIsDeleting(true)
     setError('')
     try {
@@ -55,41 +53,30 @@ export default function VideoEditor({ video, onUpdated, onDeleted }) {
   return (
     <section className="video-editor">
       <div className="editor-header">
-        <h3>Edit saved video</h3>
-        <button
-          type="button"
-          className="danger-button"
-          onClick={handleDelete}
-          disabled={isDeleting || isSaving}
-        >
-          {isDeleting ? 'Deleting…' : 'Delete'}
+        <h3>{t('editSavedVideo')}</h3>
+        <button type="button" className="danger-button" onClick={handleDelete}
+          disabled={isDeleting || isSaving}>
+          {isDeleting ? t('deleting') : t('delete')}
         </button>
       </div>
 
       <form className="editor-form" onSubmit={handleSave}>
         <label>
-          Title
-          <input value={title} onChange={(event) => setTitle(event.target.value)} />
+          {t('fieldTitle')}
+          <input value={title} onChange={(e) => setTitle(e.target.value)} />
         </label>
         <label>
-          Description
-          <textarea
-            rows={3}
-            value={description}
-            onChange={(event) => setDescription(event.target.value)}
-          />
+          {t('fieldDescription')}
+          <textarea rows={3} value={description} onChange={(e) => setDescription(e.target.value)} />
         </label>
         <label>
-          Transcript
-          <textarea
-            rows={8}
-            value={transcriptText}
-            onChange={(event) => setTranscriptText(event.target.value)}
-            disabled={video.status !== 'ready'}
-          />
+          {t('fieldTranscript')}
+          <textarea rows={8} value={transcriptText}
+            onChange={(e) => setTranscriptText(e.target.value)}
+            disabled={video.status !== 'ready'} />
         </label>
         <button type="submit" disabled={isSaving || isDeleting}>
-          {isSaving ? 'Saving…' : 'Save changes'}
+          {isSaving ? t('saving') : t('saveChanges')}
         </button>
       </form>
       {error ? <p className="error">{error}</p> : null}

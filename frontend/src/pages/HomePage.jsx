@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 
 import { createVideo, getVideo, listVideos } from '../api/client.js'
+import { useLanguage } from '../context/LanguageContext.jsx'
 import ChatPanel from '../components/ChatPanel.jsx'
 import TranscriptViewer from '../components/TranscriptViewer.jsx'
 import UrlSubmitForm from '../components/UrlSubmitForm.jsx'
@@ -8,12 +9,37 @@ import VideoDetails from '../components/VideoDetails.jsx'
 import VideoEditor from '../components/VideoEditor.jsx'
 import VideoLibrary from '../components/VideoLibrary.jsx'
 
+function LanguageToggle() {
+  const { lang, switchLang } = useLanguage()
+  return (
+    <div className="lang-toggle" aria-label="Language selector">
+      <button
+        type="button"
+        className={`lang-btn${lang === 'en' ? ' lang-btn-active' : ''}`}
+        onClick={() => switchLang('en')}
+        aria-pressed={lang === 'en'}
+      >
+        EN
+      </button>
+      <button
+        type="button"
+        className={`lang-btn${lang === 'ar' ? ' lang-btn-active' : ''}`}
+        onClick={() => switchLang('ar')}
+        aria-pressed={lang === 'ar'}
+      >
+        ع
+      </button>
+    </div>
+  )
+}
+
 export default function HomePage() {
-  const [video, setVideo] = useState(null)
+  const { t } = useLanguage()
+  const [video, setVideo]               = useState(null)
   const [recentVideos, setRecentVideos] = useState([])
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [showEditor, setShowEditor] = useState(false)
-  const [error, setError] = useState('')
+  const [showEditor, setShowEditor]     = useState(false)
+  const [error, setError]               = useState('')
   const [backendError, setBackendError] = useState('')
   const [loadingLibrary, setLoadingLibrary] = useState(true)
   const detailRef = useRef(null)
@@ -24,16 +50,13 @@ export default function HomePage() {
       setRecentVideos(videos)
       setBackendError('')
     } catch (err) {
-      // Show a banner but keep the rest of the page usable.
       setBackendError(err.message)
     } finally {
       setLoadingLibrary(false)
     }
   }
 
-  useEffect(() => {
-    loadRecentVideos()
-  }, [])
+  useEffect(() => { loadRecentVideos() }, [])
 
   async function handleSubmit(url) {
     setIsSubmitting(true)
@@ -78,7 +101,6 @@ export default function HomePage() {
 
   useEffect(() => {
     if (!video || video.status === 'ready' || video.status === 'failed') return
-
     const timer = setInterval(async () => {
       try {
         const refreshed = await getVideo(video.id)
@@ -90,21 +112,25 @@ export default function HomePage() {
         setError(err.message)
       }
     }, 1500)
-
     return () => clearInterval(timer)
   }, [video])
 
   return (
     <main className="page">
       <section className="hero">
-        <h1>MyInsta</h1>
-        <p>Paste an Instagram video link, save it to your library, transcribe it, then chat with the transcript.</p>
+        <div className="hero-top">
+          <div className="hero-text">
+            <h1>{t('appName')}</h1>
+            <p>{t('appSubtitle')}</p>
+          </div>
+          <LanguageToggle />
+        </div>
       </section>
 
       {backendError && (
         <div className="backend-error-banner">
-          <span>⚠️ Backend offline: {backendError}</span>
-          <button type="button" onClick={loadRecentVideos}>Retry</button>
+          <span>{t('backendOffline')} {backendError}</span>
+          <button type="button" onClick={loadRecentVideos}>{t('retry')}</button>
         </div>
       )}
 
@@ -116,16 +142,16 @@ export default function HomePage() {
       {loadingLibrary ? (
         <div className="library-loading">
           <span className="library-loading-spinner" />
-          Connecting to server…
+          {t('connectingToServer')}
         </div>
       ) : (
-      <VideoLibrary
-        videos={recentVideos}
-        selectedId={video?.id}
-        onView={(videoId) => openVideo(videoId, { edit: false })}
-        onEdit={(videoId) => openVideo(videoId, { edit: true })}
-        onDeleted={handleVideoDeleted}
-      />
+        <VideoLibrary
+          videos={recentVideos}
+          selectedId={video?.id}
+          onView={(videoId) => openVideo(videoId, { edit: false })}
+          onEdit={(videoId) => openVideo(videoId, { edit: true })}
+          onDeleted={handleVideoDeleted}
+        />
       )}
 
       {video ? (
@@ -142,7 +168,7 @@ export default function HomePage() {
             ) : (
               <div className="detail-actions">
                 <button type="button" onClick={() => setShowEditor(true)}>
-                  Edit this video
+                  {t('editThisVideo')}
                 </button>
               </div>
             )}

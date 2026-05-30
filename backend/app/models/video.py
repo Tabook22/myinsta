@@ -40,6 +40,7 @@ class VideoResponse(BaseModel):
     creator_url: str | None = None
     error_message: str | None = None
     video_url: str | None = None
+    audio_url: str | None = None
     transcript: TranscriptResponse | None = None
     created_at: str
     updated_at: str

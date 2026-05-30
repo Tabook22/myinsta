@@ -586,6 +586,68 @@ button:disabled {
   background: #dc2626;
 }
 
+/* ── Audio player ─────────────────────────────────────────── */
+.audio-player-wrap {
+  margin-bottom: 16px;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  overflow: hidden;
+  background: #f8fafc;
+}
+
+.audio-player-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  background: #eef2ff;
+  border-bottom: 1px solid #e2e8f0;
+  font-size: 14px;
+  font-weight: 600;
+  color: #4f46e5;
+}
+
+.audio-player-header svg {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+}
+
+.audio-player-header span {
+  flex: 1;
+}
+
+.audio-download-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 12px;
+  border-radius: 8px;
+  background: #4f46e5;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+  transition: background 0.15s;
+  flex-shrink: 0;
+}
+
+.audio-download-btn:hover {
+  background: #4338ca;
+}
+
+.audio-download-btn svg {
+  width: 14px;
+  height: 14px;
+}
+
+.audio-player {
+  display: block;
+  width: 100%;
+  padding: 10px 14px;
+  background: transparent;
+}
+
 @media (max-width: 800px) {
   .grid,
   .url-form {

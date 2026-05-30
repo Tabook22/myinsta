@@ -60,6 +60,16 @@ export function getVideoStreamUrl(video) {
   return `${API_BASE_URL}${video.video_url}`
 }
 
+export function getAudioStreamUrl(video) {
+  if (!video?.audio_url) return null
+  return `${API_BASE_URL}${video.audio_url}`
+}
+
+export function getAudioDownloadUrl(video) {
+  if (!video?.audio_url) return null
+  return `${API_BASE_URL}${video.audio_url}?download=true`
+}
+
 export function createVideo(url) {
   return request('/api/videos', {
     method: 'POST',

@@ -1,9 +1,11 @@
+import AudioPlayer from './AudioPlayer.jsx'
 import VideoPlayer from './VideoPlayer.jsx'
 
 export default function VideoDetails({ video }) {
   return (
     <section>
       <VideoPlayer video={video} />
+      <AudioPlayer video={video} />
       {!video.video_url && video.thumbnail_url ? (
         <img
           className="thumbnail"

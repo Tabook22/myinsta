@@ -16,7 +16,7 @@ from app.models.video import (
     VideoResponse,
     VideoUpdateRequest,
 )
-from app.services.audio_extractor import extract_audio
+from app.services.audio_extractor import extract_audio, extract_audio_mp3
 from app.services.chat_service import answer_from_transcript
 from app.services.web_search import search_web
 from app.services.library_storage import (
@@ -36,6 +36,15 @@ def _video_has_file(row) -> bool:
     return bool(path and Path(path).exists())
 
 
+def _audio_has_file(row) -> bool:
+    """Check if a playable audio file exists (MP3 preferred, WAV fallback)."""
+    wav_path = row["local_audio_path"]
+    if not wav_path:
+        return False
+    mp3_path = Path(wav_path).with_suffix(".mp3")
+    return mp3_path.exists() or Path(wav_path).exists()
+
+
 def _row_to_video_response(row, transcript_row=None) -> VideoResponse:
     transcript = None
     if transcript_row:
@@ -49,6 +58,7 @@ def _row_to_video_response(row, transcript_row=None) -> VideoResponse:
         }
 
     video_url = f"/api/videos/{row['id']}/stream" if _video_has_file(row) else None
+    audio_url = f"/api/videos/{row['id']}/audio" if _audio_has_file(row) else None
 
     return VideoResponse(
         id=row["id"],
@@ -66,6 +76,7 @@ def _row_to_video_response(row, transcript_row=None) -> VideoResponse:
         creator_url=row["creator_url"],
         error_message=row["error_message"],
         video_url=video_url,
+        audio_url=audio_url,
         transcript=transcript,
         created_at=row["created_at"],
         updated_at=row["updated_at"],
@@ -108,7 +119,11 @@ def process_video(video_id: int) -> None:
         )
 
         video_path = Path(download_result["local_video_path"])
-        audio_path = extract_audio(video_path, settings.audio_path)
+        audio_path = extract_audio(video_path, settings.audio_path)           # WAV for Whisper
+        try:
+            extract_audio_mp3(video_path, settings.audio_path)                # MP3 for playback
+        except Exception:
+            pass  # MP3 is optional — transcription still works without it
         transcript_result = transcribe_audio(audio_path)
 
         content_type = detect_content_type(
@@ -297,6 +312,50 @@ def stream_video(video_id: int) -> FileResponse:
 
         media_type = mimetypes.guess_type(video_path.name)[0] or "video/mp4"
         return FileResponse(video_path, media_type=media_type, filename=video_path.name)
+
+
+@router.get("/{video_id}/audio")
+def stream_audio(video_id: int, download: bool = False) -> FileResponse:
+    """Stream or download the extracted audio for a video.
+    Serves MP3 (high quality stereo) if available, falls back to WAV.
+    Add ?download=true to trigger a file download instead of inline playback.
+    """
+    with get_connection() as conn:
+        row = conn.execute(
+            "SELECT local_audio_path, title FROM videos WHERE id = ?",
+            (video_id,),
+        ).fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="Video not found")
+        if not row["local_audio_path"]:
+            raise HTTPException(status_code=404, detail="Audio not available for this video")
+
+        wav_path = Path(row["local_audio_path"])
+        mp3_path = wav_path.with_suffix(".mp3")
+
+        # Prefer MP3 (high quality stereo), fall back to WAV
+        if mp3_path.exists():
+            audio_path = mp3_path
+            media_type = "audio/mpeg"
+        elif wav_path.exists():
+            audio_path = wav_path
+            media_type = "audio/wav"
+        else:
+            raise HTTPException(status_code=404, detail="Audio file not found on disk")
+
+        safe_title = (row["title"] or f"video-{video_id}").replace("/", "-")
+        filename = f"{safe_title}{audio_path.suffix}"
+
+        headers = {}
+        if download:
+            headers["Content-Disposition"] = f'attachment; filename="{filename}"'
+
+        return FileResponse(
+            audio_path,
+            media_type=media_type,
+            filename=filename,
+            headers=headers,
+        )
 
 
 @router.get("/{video_id}/chat", response_model=ChatHistoryResponse)

@@ -126,6 +126,10 @@ export const translations = {
     deleteCol: 'Delete column',
     deleteRow: 'Delete row',
     deleteTable: 'Delete table',
+    downloadNotesPdf: 'Download notes as PDF',
+    downloadNotesPdfShort: 'PDF',
+    notesPdfFilename: (title) => `notes-${title || 'untitled'}.pdf`,
+    notesPdfGenerating: 'Generating PDF…',
   },
 
   ar: {
@@ -250,5 +254,9 @@ export const translations = {
     deleteCol: 'حذف عمود',
     deleteRow: 'حذف صف',
     deleteTable: 'حذف الجدول',
+    downloadNotesPdf: 'تحميل الملاحظات كـ PDF',
+    downloadNotesPdfShort: 'PDF',
+    notesPdfFilename: (title) => `ملاحظات-${title || 'بلا-عنوان'}.pdf`,
+    notesPdfGenerating: 'جارٍ إنشاء PDF…',
   },
 }

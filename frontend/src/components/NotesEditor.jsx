@@ -9,6 +9,7 @@ import Highlight from '@tiptap/extension-highlight'
 import Link from '@tiptap/extension-link'
 import Image from '@tiptap/extension-image'
 import { Table, TableRow, TableHeader, TableCell } from '@tiptap/extension-table'
+import html2pdf from 'html2pdf.js'
 import { updateVideo } from '../api/client.js'
 import { useLanguage } from '../context/LanguageContext.jsx'
 
@@ -33,9 +34,11 @@ function Sep() { return <span className="rte-sep" /> }
 export default function NotesEditor({ video }) {
   const { t } = useLanguage()
   const [saveStatus, setSaveStatus]   = useState('idle') // idle | saving | saved | error
+  const [pdfGenerating, setPdfGenerating] = useState(false)
   const saveTimer   = useRef(null)
   const statusTimer = useRef(null)
   const imageInput  = useRef(null)
+  const editorRef   = useRef(null)
 
   // Debounced auto-save (1 second after last keystroke)
   const saveNotes = useCallback(async (html) => {
@@ -129,6 +132,66 @@ export default function NotesEditor({ video }) {
     else    editor.chain().focus().setFontSize(v).run()
   }, [editor])
 
+  const downloadAsPdf = useCallback(async () => {
+    if (!editor || pdfGenerating) return
+    setPdfGenerating(true)
+
+    // Build a styled wrapper so the PDF looks clean
+    const title   = video.title || t('untitledVideo')
+    const filename = t('notesPdfFilename', title.replace(/[/\\:*?"<>|]/g, '-'))
+    const isRtl    = document.documentElement.dir === 'rtl'
+
+    const wrapper = document.createElement('div')
+    wrapper.style.cssText = [
+      'font-family: "Segoe UI", Arial, sans-serif',
+      'font-size: 14px',
+      'line-height: 1.7',
+      'color: #1e293b',
+      'padding: 8px',
+      `direction: ${isRtl ? 'rtl' : 'ltr'}`,
+      `text-align: ${isRtl ? 'right' : 'left'}`,
+    ].join(';')
+
+    // Title heading
+    const heading = document.createElement('h1')
+    heading.style.cssText = 'font-size:20px;margin:0 0 4px;color:#0f172a;border-bottom:2px solid #e2e8f0;padding-bottom:6px'
+    heading.textContent = title
+
+    // Subtitle (date)
+    const sub = document.createElement('p')
+    sub.style.cssText = 'font-size:11px;color:#94a3b8;margin:0 0 16px'
+    sub.textContent = new Date().toLocaleDateString(isRtl ? 'ar-SA' : 'en-US', {
+      year: 'numeric', month: 'long', day: 'numeric',
+    })
+
+    // Notes body — clone the rendered ProseMirror content
+    const body = document.createElement('div')
+    body.innerHTML = editor.getHTML()
+
+    wrapper.appendChild(heading)
+    wrapper.appendChild(sub)
+    wrapper.appendChild(body)
+
+    // Temporarily attach to DOM so html2pdf can measure it
+    wrapper.style.position = 'absolute'
+    wrapper.style.left = '-9999px'
+    document.body.appendChild(wrapper)
+
+    try {
+      await html2pdf().set({
+        margin:      [12, 14, 12, 14],   // top, right, bottom, left (mm)
+        filename,
+        image:       { type: 'jpeg', quality: 0.97 },
+        html2canvas: { scale: 2, useCORS: true, logging: false },
+        jsPDF:       { unit: 'mm', format: 'a4', orientation: 'portrait' },
+        pagebreak:   { mode: ['avoid-all', 'css'] },
+      }).from(wrapper).save()
+    } finally {
+      document.body.removeChild(wrapper)
+      setPdfGenerating(false)
+    }
+  }, [editor, pdfGenerating, video.title, t])
+
   if (!editor) return null
 
   const curHeading = [1,2,3,4].find(l => editor.isActive('heading', { level: l })) ?? 0
@@ -150,6 +213,27 @@ export default function NotesEditor({ video }) {
           {saveStatus === 'saved'  && t('noteSaved')}
           {saveStatus === 'error'  && t('noteSaveFailed')}
         </span>
+
+        <button
+          type="button"
+          className="notes-pdf-btn"
+          onClick={downloadAsPdf}
+          disabled={pdfGenerating}
+          title={t('downloadNotesPdf')}
+        >
+          {pdfGenerating ? t('notesPdfGenerating') : (
+            <>
+              {/* Download icon */}
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+                stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                <polyline points="7 10 12 15 17 10"/>
+                <line x1="12" y1="15" x2="12" y2="3"/>
+              </svg>
+              {t('downloadNotesPdfShort')}
+            </>
+          )}
+        </button>
       </div>
 
       {/* ── Toolbar ── */}

@@ -775,6 +775,39 @@ button:disabled {
 .notes-save-saved  { background: #dcfce7; color: #16a34a; opacity: 1; }
 .notes-save-error  { background: #fee2e2; color: #dc2626; opacity: 1; }
 
+/* PDF download button */
+.notes-pdf-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+  padding: 4px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #0f172a;
+  background: #fff;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+  white-space: nowrap;
+  flex-shrink: 0;
+  min-height: unset;
+}
+.notes-pdf-btn:hover:not(:disabled) {
+  background: #f1f5f9;
+  border-color: #94a3b8;
+}
+.notes-pdf-btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+.notes-pdf-btn svg {
+  width: 13px;
+  height: 13px;
+  flex-shrink: 0;
+}
+
 /* Toolbar */
 .rte-toolbar {
   display: flex;
@@ -1034,6 +1067,7 @@ button:disabled {
 /* Status badge right-to-left */
 [dir="rtl"] .notes-editor-header { flex-direction: row-reverse; }
 [dir="rtl"] .notes-editor-header span:first-of-type { text-align: right; }
+[dir="rtl"] .notes-pdf-btn { margin-left: 0; margin-right: auto; }
 
 /* Library table alignment — desktop only (mobile uses grid layout) */
 @media (min-width: 641px) {

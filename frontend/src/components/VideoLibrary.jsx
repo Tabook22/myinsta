@@ -75,6 +75,16 @@ export default function VideoLibrary({ videos, selectedId, onView, onEdit, onDel
                   {group.items.map((item) => (
                     <tr key={item.id} className={selectedId === item.id ? 'library-row-active' : ''}>
                       <td className="library-title-cell">
+                        {/* Thumbnail */}
+                        {item.thumbnail_url && (
+                          <img
+                            className="library-thumb"
+                            src={item.thumbnail_url}
+                            alt=""
+                            loading="lazy"
+                            onError={(e) => { e.target.style.display = 'none' }}
+                          />
+                        )}
                         <span className="library-title-text">
                           {item.title || t('videoHash', item.id)}
                         </span>

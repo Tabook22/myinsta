@@ -136,6 +136,13 @@ export default function ChatPanel({ video }) {
         <input
           value={message}
           onChange={(e) => setMessage(e.target.value)}
+          onKeyDown={(e) => {
+            // Ctrl+Enter or Cmd+Enter submits even when textarea would add newline
+            if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+              e.preventDefault()
+              if (message.trim() && isReady && !isSending) handleSubmit(e)
+            }
+          }}
           placeholder={
             isReady
               ? mode === 'web' ? t('inputPlaceholderWeb') : t('inputPlaceholderTranscript')

@@ -130,6 +130,15 @@ export const translations = {
     downloadNotesPdfShort: 'PDF',
     notesPdfFilename: (title) => `notes-${title || 'untitled'}.pdf`,
     notesPdfGenerating: 'Generating PDF…',
+    notesSaveShortcut: 'Ctrl+S to save immediately',
+
+    // ── Theme ────────────────────────────────────────────────────────────────
+    switchToDark: 'Switch to dark mode',
+    switchToLight: 'Switch to light mode',
+
+    // ── Transcript actions ────────────────────────────────────────────────────
+    copyTranscript: 'Copy transcript',
+    transcriptCopied: '✓ Copied!',
   },
 
   ar: {
@@ -258,5 +267,14 @@ export const translations = {
     downloadNotesPdfShort: 'PDF',
     notesPdfFilename: (title) => `ملاحظات-${title || 'بلا-عنوان'}.pdf`,
     notesPdfGenerating: 'جارٍ إنشاء PDF…',
+    notesSaveShortcut: 'Ctrl+S للحفظ الفوري',
+
+    // ── Theme ────────────────────────────────────────────────────────────────
+    switchToDark: 'التبديل إلى الوضع الداكن',
+    switchToLight: 'التبديل إلى الوضع الفاتح',
+
+    // ── Transcript actions ────────────────────────────────────────────────────
+    copyTranscript: 'نسخ النص',
+    transcriptCopied: '✓ تم النسخ!',
   },
 }

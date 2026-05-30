@@ -1085,6 +1085,213 @@ button:disabled {
 /* Creator link icon spacing */
 [dir="rtl"] .creator-link svg { margin-left: 0; margin-right: 4px; }
 
+/* ── Hero controls (theme + language toggles) ────────────────────────────── */
+.hero-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  margin-top: 6px;
+}
+
+/* Theme toggle button */
+.theme-toggle-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #f8fafc;
+  color: #64748b;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+  flex-shrink: 0;
+  min-height: unset;
+}
+.theme-toggle-btn:hover {
+  background: #eef2ff;
+  color: #4f46e5;
+  border-color: #c7d2fe;
+}
+.theme-toggle-btn svg {
+  width: 17px;
+  height: 17px;
+}
+
+/* ── Transcript header + copy button ────────────────────────────────────── */
+.transcript-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+.transcript-header h3 { margin: 0; }
+
+.copy-transcript-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #475569;
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+  white-space: nowrap;
+  flex-shrink: 0;
+  min-height: unset;
+}
+.copy-transcript-btn:hover {
+  background: #e0e7ff;
+  color: #4f46e5;
+  border-color: #c7d2fe;
+}
+.copy-transcript-btn-done {
+  background: #dcfce7 !important;
+  color: #16a34a !important;
+  border-color: #bbf7d0 !important;
+}
+.copy-transcript-btn svg {
+  width: 13px;
+  height: 13px;
+  flex-shrink: 0;
+}
+
+/* ── Library thumbnail ───────────────────────────────────────────────────── */
+.library-thumb {
+  width: 40px;
+  height: 40px;
+  object-fit: cover;
+  border-radius: 6px;
+  flex-shrink: 0;
+  display: block;
+  background: #e2e8f0;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   DARK MODE  [data-theme="dark"]
+   One block overrides all hardcoded light colours.
+═══════════════════════════════════════════════════════════ */
+[data-theme="dark"] {
+  color: #e2e8f0;
+  background: #0f172a;
+}
+
+/* Page & cards */
+[data-theme="dark"] .card                  { background: #1e293b; border-color: #334155; }
+[data-theme="dark"] .hero p                { color: #94a3b8; }
+
+/* Controls bar */
+[data-theme="dark"] .hero-controls {}
+[data-theme="dark"] .theme-toggle-btn      { background: #1e293b; color: #94a3b8; border-color: #334155; }
+[data-theme="dark"] .theme-toggle-btn:hover { background: #1e1b4b; color: #818cf8; border-color: #4f46e5; }
+[data-theme="dark"] .lang-toggle           { border-color: #334155; }
+[data-theme="dark"] .lang-btn              { background: #1e293b; color: #94a3b8; }
+[data-theme="dark"] .lang-btn:first-child  { border-color: #334155; }
+[data-theme="dark"] .lang-btn:hover:not(.lang-btn-active) { background: #1e1b4b; color: #818cf8; }
+
+/* Forms */
+[data-theme="dark"] .url-form input,
+[data-theme="dark"] .editor-form input,
+[data-theme="dark"] .editor-form textarea  { background: #0f172a; border-color: #475569; color: #e2e8f0; }
+[data-theme="dark"] input::placeholder,
+[data-theme="dark"] textarea::placeholder  { color: #475569; }
+
+/* Backend banner */
+[data-theme="dark"] .backend-error-banner  { background: #1c0a0a; border-color: #7f1d1d; color: #fca5a5; }
+[data-theme="dark"] .backend-error-banner button { background: #7f1d1d; }
+[data-theme="dark"] .backend-error-banner button:hover { background: #991b1b; }
+
+/* Loading spinner */
+[data-theme="dark"] .library-loading       { color: #64748b; }
+[data-theme="dark"] .library-loading-spinner { border-color: #334155; border-top-color: #818cf8; }
+
+/* Library */
+[data-theme="dark"] .library-panel-subtitle,
+[data-theme="dark"] .library-empty         { color: #64748b; }
+[data-theme="dark"] .library-table th      { color: #64748b; }
+[data-theme="dark"] .library-table th,
+[data-theme="dark"] .library-table td      { border-color: #334155; }
+[data-theme="dark"] .library-row-active    { background: #1e1b4b; }
+[data-theme="dark"] .library-stamp-cell,
+[data-theme="dark"] .library-date-cell     { color: #64748b; }
+[data-theme="dark"] .library-group h4      { color: #475569; }
+[data-theme="dark"] .library-thumb         { background: #334155; }
+[data-theme="dark"] .status                { background: #1e1b4b; color: #818cf8; }
+
+/* Transcript copy */
+[data-theme="dark"] .copy-transcript-btn   { background: #1e293b; color: #94a3b8; border-color: #334155; }
+[data-theme="dark"] .copy-transcript-btn:hover { background: #1e1b4b; color: #818cf8; border-color: #4f46e5; }
+[data-theme="dark"] .copy-transcript-btn-done  { background: #052e16 !important; color: #4ade80 !important; border-color: #166534 !important; }
+
+/* Transcript text */
+[data-theme="dark"] .transcript            { color: #e2e8f0; }
+
+/* Detail sections */
+[data-theme="dark"] .detail-actions        { border-color: #334155; }
+[data-theme="dark"] .video-editor          { border-color: #334155; }
+
+/* Chat */
+[data-theme="dark"] .chat-box              { border-color: #334155; color: #94a3b8; background: transparent; }
+[data-theme="dark"] .chat-message p        { color: #e2e8f0; }
+[data-theme="dark"] .chat-message-user     { background: #1e1b4b; }
+[data-theme="dark"] .chat-message-assistant { background: #1e293b; border-color: #334155; }
+[data-theme="dark"] .chat-mode-toggle      { border-color: #334155; }
+[data-theme="dark"] .chat-mode-btn         { background: #1e293b; color: #94a3b8; }
+[data-theme="dark"] .chat-mode-btn:first-child { border-color: #334155; }
+[data-theme="dark"] .chat-mode-btn:hover:not(:disabled) { background: #1e1b4b; color: #818cf8; }
+[data-theme="dark"] .notice-info           { color: #818cf8; }
+[data-theme="dark"] .notice-warning        { color: #fbbf24; }
+[data-theme="dark"] .notice-link           { color: #818cf8; }
+[data-theme="dark"] .chat-placeholder      { color: #64748b; }
+
+/* Audio player */
+[data-theme="dark"] .audio-player-wrap     { background: #1e293b; border-color: #334155; }
+[data-theme="dark"] .audio-player-header   { background: #1e1b4b; border-color: #334155; color: #818cf8; }
+
+/* Notes editor */
+[data-theme="dark"] .notes-editor-wrap     { background: #1e293b; border-color: #334155; }
+[data-theme="dark"] .notes-editor-header   { background: #052e16; border-color: #334155; }
+[data-theme="dark"] .notes-save-saving     { background: #1e1b4b; color: #818cf8; }
+[data-theme="dark"] .notes-save-saved      { background: #052e16; color: #4ade80; }
+[data-theme="dark"] .notes-save-error      { background: #1c0a0a; color: #fca5a5; }
+[data-theme="dark"] .notes-pdf-btn         { background: #1e293b; color: #e2e8f0; border-color: #475569; }
+[data-theme="dark"] .notes-pdf-btn:hover:not(:disabled) { background: #334155; border-color: #64748b; }
+
+/* Toolbar */
+[data-theme="dark"] .rte-toolbar           { background: #1e293b; border-color: #334155; }
+[data-theme="dark"] .rte-btn               { color: #cbd5e1; }
+[data-theme="dark"] .rte-btn:hover:not(:disabled) { background: #1e1b4b; color: #818cf8; }
+[data-theme="dark"] .rte-select            { background: #0f172a; border-color: #475569; color: #cbd5e1; }
+[data-theme="dark"] .rte-sep               { background: #334155; }
+[data-theme="dark"] .rte-color-btn:hover   { background: #1e1b4b; }
+[data-theme="dark"] .rte-color-label       { color: #cbd5e1; }
+
+/* Editor body */
+[data-theme="dark"] .rte-body .ProseMirror        { color: #e2e8f0; }
+[data-theme="dark"] .rte-body .ProseMirror a      { color: #818cf8; }
+[data-theme="dark"] .rte-body .ProseMirror blockquote { color: #94a3b8; border-color: #475569; }
+[data-theme="dark"] .rte-body .ProseMirror code   { background: #0f172a; color: #e2e8f0; }
+[data-theme="dark"] .rte-body .ProseMirror th     { background: #0f172a; }
+[data-theme="dark"] .rte-body .ProseMirror th,
+[data-theme="dark"] .rte-body .ProseMirror td     { border-color: #475569; }
+[data-theme="dark"] .rte-body .ProseMirror p.is-editor-empty:first-child::before { color: #475569; }
+
+/* Mobile library card rows in dark mode */
+@media (max-width: 600px) {
+  [data-theme="dark"] .library-table tr        { background: #1e293b; border-color: #334155; }
+  [data-theme="dark"] .library-row-active      { background: #1e1b4b !important; border-color: #4f46e5 !important; }
+  [data-theme="dark"] .library-table td:nth-child(4) { color: #64748b; }
+}
+
 /* ═══════════════════════════════════════════════════════════
    RESPONSIVE — Tablet  ≤ 800 px
    Two-column → single column, slightly tighter spacing.
@@ -1120,8 +1327,16 @@ button:disabled {
   .card  { padding: 12px; border-radius: 12px; }
   .grid  { gap: 12px; margin-top: 12px; }
 
+  /* ── Hero controls ── */
+  .hero-controls { margin-top: 0; gap: 6px; }
+  .theme-toggle-btn { width: 32px; height: 32px; }
+  .theme-toggle-btn svg { width: 15px; height: 15px; }
+
   /* ── Lang toggle ── */
   .lang-btn { padding: 5px 11px; font-size: 12px; }
+
+  /* ── Thumbnail: hide on very small screens to keep rows compact ── */
+  .library-thumb { display: none; }
 
   /* ── Touch targets: 44 px minimum (Apple HIG) ── */
   button { min-height: 44px; padding: 10px 14px; border-radius: 10px; }

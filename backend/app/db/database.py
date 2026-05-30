@@ -11,6 +11,7 @@ MIGRATIONS = [
     "ALTER TABLE videos ADD COLUMN local_transcript_path TEXT",
     "ALTER TABLE videos ADD COLUMN content_type TEXT NOT NULL DEFAULT 'unknown'",
     "ALTER TABLE videos ADD COLUMN creator_url TEXT",
+    "ALTER TABLE videos ADD COLUMN notes TEXT",
 ]
 
 

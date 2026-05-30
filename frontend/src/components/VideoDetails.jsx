@@ -1,4 +1,5 @@
 import AudioPlayer from './AudioPlayer.jsx'
+import NotesEditor from './NotesEditor.jsx'
 import VideoPlayer from './VideoPlayer.jsx'
 
 export default function VideoDetails({ video }) {
@@ -54,6 +55,8 @@ export default function VideoDetails({ video }) {
       {video.error_message ? (
         <p className="error">{video.error_message}</p>
       ) : null}
+
+      <NotesEditor video={video} />
     </section>
   )
 }

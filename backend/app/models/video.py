@@ -16,6 +16,7 @@ class VideoUpdateRequest(BaseModel):
     title: str | None = None
     description: str | None = None
     transcript_text: str | None = None
+    notes: str | None = None
 
 
 class TranscriptResponse(BaseModel):
@@ -41,6 +42,7 @@ class VideoResponse(BaseModel):
     error_message: str | None = None
     video_url: str | None = None
     audio_url: str | None = None
+    notes: str | None = None
     transcript: TranscriptResponse | None = None
     created_at: str
     updated_at: str

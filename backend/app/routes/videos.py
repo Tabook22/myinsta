@@ -77,6 +77,7 @@ def _row_to_video_response(row, transcript_row=None) -> VideoResponse:
         error_message=row["error_message"],
         video_url=video_url,
         audio_url=audio_url,
+        notes=row["notes"] if "notes" in row.keys() else None,
         transcript=transcript,
         created_at=row["created_at"],
         updated_at=row["updated_at"],
@@ -246,6 +247,8 @@ def update_video(video_id: int, payload: VideoUpdateRequest) -> VideoResponse:
         if payload.description is not None:
             updates["description"] = payload.description
             metadata_updates["description"] = payload.description
+        if payload.notes is not None:
+            updates["notes"] = payload.notes
 
         if updates:
             assignments = ", ".join(f"{key} = ?" for key in updates)

@@ -78,6 +78,7 @@ def _row_to_video_response(row, transcript_row=None) -> VideoResponse:
         video_url=video_url,
         audio_url=audio_url,
         notes=row["notes"] if "notes" in row.keys() else None,
+        tags=json.loads(row["tags"]) if row["tags"] else [],
         transcript=transcript,
         created_at=row["created_at"],
         updated_at=row["updated_at"],
@@ -219,6 +220,23 @@ def list_videos() -> list[VideoResponse]:
         return [_row_to_video_response(row) for row in rows]
 
 
+@router.get("/stats")
+def get_stats() -> dict:
+    """Aggregate library statistics."""
+    with get_connection() as conn:
+        total   = conn.execute("SELECT COUNT(*) FROM videos").fetchone()[0]
+        ready   = conn.execute("SELECT COUNT(*) FROM videos WHERE status = 'ready'").fetchone()[0]
+        dur_row = conn.execute("SELECT SUM(duration_seconds) FROM videos WHERE status = 'ready'").fetchone()
+        total_seconds = dur_row[0] or 0
+        chats   = conn.execute("SELECT COUNT(*) FROM chat_messages WHERE role = 'user'").fetchone()[0]
+    return {
+        "total_videos": total,
+        "ready_videos": ready,
+        "total_duration_seconds": float(total_seconds),
+        "total_chats": chats,
+    }
+
+
 @router.get("/{video_id}", response_model=VideoResponse)
 def get_video(video_id: int) -> VideoResponse:
     with get_connection() as conn:
@@ -249,6 +267,8 @@ def update_video(video_id: int, payload: VideoUpdateRequest) -> VideoResponse:
             metadata_updates["description"] = payload.description
         if payload.notes is not None:
             updates["notes"] = payload.notes
+        if payload.tags is not None:
+            updates["tags"] = json.dumps(payload.tags)
 
         if updates:
             assignments = ", ".join(f"{key} = ?" for key in updates)

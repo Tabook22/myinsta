@@ -1,5 +1,17 @@
+import { useMemo, useState } from 'react'
 import { deleteVideo } from '../api/client.js'
 import { useLanguage } from '../context/LanguageContext.jsx'
+
+const TAG_COLORS = [
+  '#4f46e5','#0891b2','#16a34a','#ca8a04','#dc2626',
+  '#7c3aed','#0284c7','#15803d','#b45309','#be185d',
+]
+
+function tagColor(tag) {
+  let hash = 0
+  for (let i = 0; i < tag.length; i++) hash = tag.charCodeAt(i) + ((hash << 5) - hash)
+  return TAG_COLORS[Math.abs(hash) % TAG_COLORS.length]
+}
 
 function parseCreatedAt(value) {
   if (!value) return new Date()
@@ -33,6 +45,19 @@ function formatDate(value, locale) {
 export default function VideoLibrary({ videos, selectedId, onView, onEdit, onDeleted }) {
   const { t, lang } = useLanguage()
   const locale = lang === 'ar' ? 'ar-SA' : 'en-US'
+  const [activeTag, setActiveTag] = useState(null)
+
+  // Collect all unique tags across all videos
+  const allTags = useMemo(() => {
+    const set = new Set()
+    videos.forEach((v) => (v.tags || []).forEach((tag) => set.add(tag)))
+    return Array.from(set).sort()
+  }, [videos])
+
+  // Filter videos by active tag
+  const filtered = activeTag
+    ? videos.filter((v) => (v.tags || []).includes(activeTag))
+    : videos
 
   async function handleDelete(item) {
     const label = item.title || item.storage_stamp || t('videoHash', item.id)
@@ -45,7 +70,7 @@ export default function VideoLibrary({ videos, selectedId, onView, onEdit, onDel
     }
   }
 
-  const grouped = groupVideosByDate(videos, locale)
+  const grouped = groupVideosByDate(filtered, locale)
 
   return (
     <section className="card library-panel">
@@ -54,7 +79,31 @@ export default function VideoLibrary({ videos, selectedId, onView, onEdit, onDel
         <p className="library-panel-subtitle">{t('librarySubtitle')}</p>
       </div>
 
-      {!videos.length ? (
+      {/* Tag filter bar */}
+      {allTags.length > 0 && (
+        <div className="tag-filter-bar">
+          <button
+            type="button"
+            className={`tag-filter-btn${!activeTag ? ' tag-filter-btn-active' : ''}`}
+            onClick={() => setActiveTag(null)}
+          >
+            {t('filterAll')}
+          </button>
+          {allTags.map((tag) => (
+            <button
+              key={tag}
+              type="button"
+              className={`tag-filter-btn${activeTag === tag ? ' tag-filter-btn-active' : ''}`}
+              style={{ '--tag-color': tagColor(tag) }}
+              onClick={() => setActiveTag(activeTag === tag ? null : tag)}
+            >
+              #{tag}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {!filtered.length ? (
         <p className="library-empty">{t('noVideos')}</p>
       ) : (
         grouped.map((group) => (
@@ -85,9 +134,26 @@ export default function VideoLibrary({ videos, selectedId, onView, onEdit, onDel
                             onError={(e) => { e.target.style.display = 'none' }}
                           />
                         )}
-                        <span className="library-title-text">
-                          {item.title || t('videoHash', item.id)}
-                        </span>
+                        <div className="library-title-stack">
+                          <span className="library-title-text">
+                            {item.title || t('videoHash', item.id)}
+                          </span>
+                          {/* Inline tag chips */}
+                          {(item.tags || []).length > 0 && (
+                            <div className="library-tag-chips">
+                              {item.tags.map((tag) => (
+                                <span
+                                  key={tag}
+                                  className="tag-chip tag-chip-sm"
+                                  style={{ '--tag-color': tagColor(tag) }}
+                                  onClick={() => setActiveTag(activeTag === tag ? null : tag)}
+                                >
+                                  #{tag}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                        </div>
                         {item.creator_url && (
                           <a
                             className="insta-link"

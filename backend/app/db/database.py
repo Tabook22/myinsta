@@ -12,6 +12,7 @@ MIGRATIONS = [
     "ALTER TABLE videos ADD COLUMN content_type TEXT NOT NULL DEFAULT 'unknown'",
     "ALTER TABLE videos ADD COLUMN creator_url TEXT",
     "ALTER TABLE videos ADD COLUMN notes TEXT",
+    "ALTER TABLE videos ADD COLUMN tags TEXT",         # JSON array of tag strings
 ]
 
 

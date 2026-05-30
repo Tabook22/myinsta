@@ -4,12 +4,32 @@ import { createVideo, getVideo, listVideos } from '../api/client.js'
 import { useLanguage } from '../context/LanguageContext.jsx'
 import { useTheme } from '../context/ThemeContext.jsx'
 import ChatPanel from '../components/ChatPanel.jsx'
+import OnboardingModal, { shouldShowOnboarding, markOnboardingDone } from '../components/OnboardingModal.jsx'
+import StatsPanel from '../components/StatsPanel.jsx'
 import TranscriptViewer from '../components/TranscriptViewer.jsx'
 import UrlSubmitForm from '../components/UrlSubmitForm.jsx'
 import VideoDetails from '../components/VideoDetails.jsx'
 import VideoEditor from '../components/VideoEditor.jsx'
 import VideoLibrary from '../components/VideoLibrary.jsx'
 
+// ── Notification helper ──────────────────────────────────────────────────────
+async function requestNotificationPermission() {
+  if (!('Notification' in window)) return
+  if (Notification.permission === 'default') {
+    await Notification.requestPermission()
+  }
+}
+
+function fireNotification(title, body) {
+  if (!('Notification' in window) || Notification.permission !== 'granted') return
+  try {
+    new Notification(title, { body, icon: '/myinsta/favicon.ico' })
+  } catch {
+    // Some browsers block notifications in certain contexts — fail silently
+  }
+}
+
+// ── Header controls ──────────────────────────────────────────────────────────
 function LanguageToggle() {
   const { lang, switchLang } = useLanguage()
   return (
@@ -47,7 +67,6 @@ function ThemeToggle() {
       aria-label={isDark ? t('switchToLight') : t('switchToDark')}
     >
       {isDark ? (
-        // Sun icon
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
           stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <circle cx="12" cy="12" r="5"/>
@@ -61,7 +80,6 @@ function ThemeToggle() {
           <line x1="18.36" y1="5.64"  x2="19.78" y2="4.22"/>
         </svg>
       ) : (
-        // Moon icon
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
           stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
@@ -71,6 +89,7 @@ function ThemeToggle() {
   )
 }
 
+// ── Page ─────────────────────────────────────────────────────────────────────
 export default function HomePage() {
   const { t } = useLanguage()
   const [video, setVideo]               = useState(null)
@@ -80,7 +99,10 @@ export default function HomePage() {
   const [error, setError]               = useState('')
   const [backendError, setBackendError] = useState('')
   const [loadingLibrary, setLoadingLibrary] = useState(true)
-  const detailRef = useRef(null)
+  const [showOnboarding, setShowOnboarding] = useState(shouldShowOnboarding)
+  const [statsKey, setStatsKey]         = useState(0) // bump to re-fetch stats
+  const detailRef   = useRef(null)
+  const prevStatus  = useRef(null)  // track status changes for notifications
 
   async function loadRecentVideos() {
     try {
@@ -97,13 +119,20 @@ export default function HomePage() {
   useEffect(() => { loadRecentVideos() }, [])
 
   async function handleSubmit(url) {
+    // Request notification permission on first submit (requires user gesture)
+    requestNotificationPermission()
+    // Dismiss onboarding on first real action
+    if (showOnboarding) { markOnboardingDone(); setShowOnboarding(false) }
+
     setIsSubmitting(true)
     setError('')
     try {
       const created = await createVideo(url)
       setVideo(created)
+      prevStatus.current = created.status
       setShowEditor(false)
       await loadRecentVideos()
+      setStatsKey((k) => k + 1)
     } catch (err) {
       setError(err.message)
     } finally {
@@ -116,6 +145,7 @@ export default function HomePage() {
     try {
       const selected = await getVideo(videoId)
       setVideo(selected)
+      prevStatus.current = selected.status
       setShowEditor(edit)
       window.setTimeout(() => {
         detailRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
@@ -135,6 +165,7 @@ export default function HomePage() {
     setVideo((current) => (current?.id === deletedId ? null : current))
     setShowEditor(false)
     loadRecentVideos()
+    setStatsKey((k) => k + 1)
   }
 
   // Escape key: close the video editor panel when it's open
@@ -146,13 +177,24 @@ export default function HomePage() {
     return () => document.removeEventListener('keydown', onKeyDown)
   }, [showEditor])
 
+  // Polling: refresh video status + fire notification when ready
   useEffect(() => {
     if (!video || video.status === 'ready' || video.status === 'failed') return
     const timer = setInterval(async () => {
       try {
         const refreshed = await getVideo(video.id)
         setVideo(refreshed)
-        if (refreshed.status === 'ready' || refreshed.status === 'failed') {
+
+        // Fire notification on status transition → ready
+        if (prevStatus.current !== 'ready' && refreshed.status === 'ready') {
+          const title = refreshed.title || t('untitledVideo')
+          fireNotification(t('notificationReady', title), t('notificationBody'))
+          await loadRecentVideos()
+          setStatsKey((k) => k + 1)
+        }
+        prevStatus.current = refreshed.status
+
+        if (refreshed.status === 'failed') {
           await loadRecentVideos()
         }
       } catch (err) {
@@ -160,10 +202,16 @@ export default function HomePage() {
       }
     }, 1500)
     return () => clearInterval(timer)
-  }, [video])
+  }, [video, t])
 
   return (
     <main className="page">
+      {/* Onboarding modal — shows only on first visit */}
+      {showOnboarding && (
+        <OnboardingModal onDone={() => setShowOnboarding(false)} />
+      )}
+
+      {/* ── Hero ── */}
       <section className="hero">
         <div className="hero-top">
           <div className="hero-text">
@@ -188,6 +236,9 @@ export default function HomePage() {
         <UrlSubmitForm onSubmit={handleSubmit} isSubmitting={isSubmitting} />
         {error ? <p className="error">{error}</p> : null}
       </section>
+
+      {/* Stats panel — re-fetches when statsKey changes */}
+      <StatsPanel key={statsKey} />
 
       {loadingLibrary ? (
         <div className="library-loading">

@@ -108,3 +108,7 @@ export function chatWithVideo(videoId, message, mode = 'transcript') {
 export function getChatHistory(videoId) {
   return request(`/api/videos/${videoId}/chat`)
 }
+
+export function getStats() {
+  return request('/api/videos/stats')
+}

@@ -139,6 +139,33 @@ export const translations = {
     // ── Transcript actions ────────────────────────────────────────────────────
     copyTranscript: 'Copy transcript',
     transcriptCopied: '✓ Copied!',
+
+    // ── Tags ─────────────────────────────────────────────────────────────────
+    fieldTags: 'Tags',
+    tagPlaceholder: 'Add tag and press Enter…',
+    filterAll: 'All',
+    noTagsYet: 'No tags yet',
+
+    // ── Stats panel ───────────────────────────────────────────────────────────
+    statsVideos: 'Videos',
+    statsTranscribed: 'Transcribed',
+    statsHours: 'hrs transcribed',
+    statsChats: 'Questions asked',
+
+    // ── Onboarding ────────────────────────────────────────────────────────────
+    onboardingTitle: 'Welcome to MyInsta!',
+    onboardingSubtitle: 'Your personal Instagram video library. Here\'s how it works:',
+    onboardingStep1Title: 'Paste any Instagram link',
+    onboardingStep1Desc: 'Drop a reel or video URL into the box — we download it automatically.',
+    onboardingStep2Title: 'AI transcribes it for you',
+    onboardingStep2Desc: 'Whisper AI extracts the audio and turns it into a searchable transcript.',
+    onboardingStep3Title: 'Chat, notes & insights',
+    onboardingStep3Desc: 'Ask questions, take rich notes, download PDFs — all in one place.',
+    onboardingGetStarted: 'Get started →',
+
+    // ── Notification ─────────────────────────────────────────────────────────
+    notificationReady: (title) => `✅ "${title}" is ready!`,
+    notificationBody: 'Your video has been transcribed. You can now chat with it.',
   },
 
   ar: {
@@ -276,5 +303,32 @@ export const translations = {
     // ── Transcript actions ────────────────────────────────────────────────────
     copyTranscript: 'نسخ النص',
     transcriptCopied: '✓ تم النسخ!',
+
+    // ── Tags ─────────────────────────────────────────────────────────────────
+    fieldTags: 'الوسوم',
+    tagPlaceholder: 'أضف وسمًا واضغط Enter…',
+    filterAll: 'الكل',
+    noTagsYet: 'لا توجد وسوم بعد',
+
+    // ── Stats panel ───────────────────────────────────────────────────────────
+    statsVideos: 'مقطع فيديو',
+    statsTranscribed: 'جاهز',
+    statsHours: 'ساعة منسوخة',
+    statsChats: 'سؤال مطروح',
+
+    // ── Onboarding ────────────────────────────────────────────────────────────
+    onboardingTitle: 'مرحباً بك في ماي إنستا!',
+    onboardingSubtitle: 'مكتبتك الشخصية لمقاطع إنستاجرام. إليك كيفية عملها:',
+    onboardingStep1Title: 'الصق أي رابط إنستاجرام',
+    onboardingStep1Desc: 'أسقط رابط مقطع أو فيديو في الصندوق — سنحمّله تلقائياً.',
+    onboardingStep2Title: 'الذكاء الاصطناعي ينسخه لك',
+    onboardingStep2Desc: 'يستخرج Whisper الصوت ويحوّله إلى نص قابل للبحث.',
+    onboardingStep3Title: 'دردشة وملاحظات ورؤى',
+    onboardingStep3Desc: 'اطرح أسئلة، خذ ملاحظات غنية، وحمّل PDF — كل ذلك في مكان واحد.',
+    onboardingGetStarted: 'ابدأ الآن ←',
+
+    // ── Notification ─────────────────────────────────────────────────────────
+    notificationReady: (title) => `✅ "${title}" جاهز!`,
+    notificationBody: 'تم نسخ الفيديو الخاص بك. يمكنك الآن التحدث معه.',
   },
 }

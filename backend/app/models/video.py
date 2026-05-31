@@ -52,6 +52,11 @@ class VideoResponse(BaseModel):
     updated_at: str
 
 
+class NotionExportRequest(BaseModel):
+    api_key: str       # Notion Integration Token (secret_…)
+    database_id: str   # Target database UUID
+
+
 class ChatRequest(BaseModel):
     message: str
     mode: ChatMode = "transcript"

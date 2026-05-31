@@ -317,7 +317,7 @@ export default function HomePage() {
         <section className="grid" ref={detailRef}>
           <div className="card">
             <VideoDetails video={video} allVideos={recentVideos} />
-            <TranscriptViewer status={video.status} transcript={video.transcript} />
+            <TranscriptViewer status={video.status} transcript={video.transcript} video={video} />
             {showEditor ? (
               <VideoEditor
                 video={video}

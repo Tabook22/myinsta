@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react'
-import { deleteVideo, getExportUrl, listTrash, permanentDeleteVideo, restoreVideo, updateVideo } from '../api/client.js'
+import { useMemo, useRef, useState } from 'react'
+import { deleteVideo, getExportUrl, getVideoStreamUrl, listTrash, permanentDeleteVideo, restoreVideo, updateVideo } from '../api/client.js'
 import { useLanguage } from '../context/LanguageContext.jsx'
 
 // ── Shared helpers ────────────────────────────────────────────────────────────
@@ -85,8 +85,22 @@ function TagChips({ tags, activeTag, onTagClick, size = 'sm' }) {
 
 // ── Grid card ─────────────────────────────────────────────────────────────────
 function VideoCard({ item, selected, onSelect, onView, onEdit, onDelete, activeTag, onTagClick, t, locale }) {
+  const [isHovering, setIsHovering] = useState(false)
+  const hoverTimer  = useRef(null)
+  const videoUrl    = getVideoStreamUrl(item)
+
+  function handleMouseEnter() {
+    if (!videoUrl) return
+    hoverTimer.current = setTimeout(() => setIsHovering(true), 350)
+  }
+  function handleMouseLeave() {
+    clearTimeout(hoverTimer.current)
+    setIsHovering(false)
+  }
+
   return (
-    <div className={`lib-card${selected ? ' lib-card-selected' : ''}`}>
+    <div className={`lib-card${selected ? ' lib-card-selected' : ''}`}
+      onMouseEnter={handleMouseEnter} onMouseLeave={handleMouseLeave}>
       {/* Checkbox */}
       <input
         type="checkbox"
@@ -97,7 +111,7 @@ function VideoCard({ item, selected, onSelect, onView, onEdit, onDelete, activeT
         aria-label={`Select ${item.title || item.id}`}
       />
 
-      {/* Thumbnail */}
+      {/* Thumbnail / preview */}
       <div className="lib-card-thumb" onClick={() => onView(item.id)}>
         {item.thumbnail_url ? (
           <img src={item.thumbnail_url} alt="" loading="lazy"
@@ -105,6 +119,16 @@ function VideoCard({ item, selected, onSelect, onView, onEdit, onDelete, activeT
         ) : (
           <span className="lib-card-thumb-placeholder">▶</span>
         )}
+
+        {/* Video preview on hover */}
+        {isHovering && videoUrl && (
+          <video
+            className="lib-card-preview"
+            src={videoUrl}
+            autoPlay muted loop playsInline
+          />
+        )}
+
         {item.duration_seconds ? (
           <span className="lib-card-duration">{formatDuration(item.duration_seconds)}</span>
         ) : null}

@@ -1,6 +1,7 @@
 import { useLanguage } from '../context/LanguageContext.jsx'
 import AudioPlayer from './AudioPlayer.jsx'
 import NotesEditor from './NotesEditor.jsx'
+import NotionExport from './NotionExport.jsx'
 import ProcessingSteps from './ProcessingSteps.jsx'
 import VideoPlayer from './VideoPlayer.jsx'
 
@@ -112,6 +113,9 @@ export default function VideoDetails({ video, allVideos = [] }) {
       {video.error_message ? (
         <p className="error">{video.error_message}</p>
       ) : null}
+
+      {/* Notion export */}
+      {video.status === 'ready' && <NotionExport video={video} />}
 
       <NotesEditor video={video} />
     </section>

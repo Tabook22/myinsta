@@ -2,6 +2,9 @@ import csv
 import io
 import json
 import mimetypes
+import re
+import urllib.error
+import urllib.request
 from pathlib import Path
 
 from fastapi import APIRouter, BackgroundTasks, HTTPException, Response
@@ -14,6 +17,7 @@ from app.models.video import (
     ChatMessageResponse,
     ChatRequest,
     ChatResponse,
+    NotionExportRequest,
     VideoCreateRequest,
     VideoResponse,
     VideoUpdateRequest,
@@ -518,6 +522,94 @@ def stream_audio(video_id: int, download: bool = False) -> FileResponse:
             filename=filename,
             headers=headers,
         )
+
+
+@router.post("/{video_id}/export-notion")
+def export_to_notion(video_id: int, payload: NotionExportRequest) -> dict:
+    """Proxy a Notion API page-creation request. API key is never stored server-side."""
+    with get_connection() as conn:
+        row = conn.execute(
+            "SELECT * FROM videos WHERE id = ? AND deleted_at IS NULL", (video_id,)
+        ).fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="Video not found")
+        transcript_row = conn.execute(
+            "SELECT full_text FROM transcripts WHERE video_id = ?", (video_id,)
+        ).fetchone()
+
+    title      = (row["title"] or f"Video #{video_id}")[:200]
+    creator    = row["uploader"] or ""
+    tags       = json.loads(row["tags"]) if row["tags"] else []
+    transcript = (transcript_row["full_text"] or "") if transcript_row else ""
+    notes_html = row["notes"] or ""
+    notes_text = re.sub(r"<[^>]+>", " ", notes_html).strip()
+
+    def text_block(content: str) -> dict:
+        return {
+            "object": "block", "type": "paragraph",
+            "paragraph": {"rich_text": [{"type": "text", "text": {"content": content}}]},
+        }
+
+    def h2_block(content: str) -> dict:
+        return {
+            "object": "block", "type": "heading_2",
+            "heading_2": {"rich_text": [{"type": "text", "text": {"content": content}}]},
+        }
+
+    children: list[dict] = []
+
+    # Callout with meta info
+    meta = f"👤 {creator}  •  🔗 {row['source_url']}"
+    if tags:
+        meta += f"  •  🏷 {', '.join(tags)}"
+    children.append({
+        "object": "block", "type": "callout",
+        "callout": {
+            "rich_text": [{"type": "text", "text": {"content": meta}}],
+            "icon": {"emoji": "📹"},
+        },
+    })
+
+    # Transcript
+    if transcript:
+        children.append(h2_block("📝 Transcript"))
+        for chunk in [transcript[i:i + 2000] for i in range(0, len(transcript), 2000)]:
+            children.append(text_block(chunk))
+
+    # Notes
+    if notes_text:
+        children.append(h2_block("📒 My Notes"))
+        for chunk in [notes_text[i:i + 2000] for i in range(0, len(notes_text), 2000)]:
+            children.append(text_block(chunk))
+
+    page_data = {
+        "parent": {"database_id": payload.database_id.replace("-", "")},
+        "properties": {
+            "title": {"title": [{"type": "text", "text": {"content": title}}]},
+        },
+        "children": children[:100],  # Notion max 100 blocks per request
+    }
+
+    try:
+        data = json.dumps(page_data).encode("utf-8")
+        req = urllib.request.Request(
+            "https://api.notion.com/v1/pages",
+            data=data,
+            headers={
+                "Authorization": f"Bearer {payload.api_key}",
+                "Notion-Version": "2022-06-28",
+                "Content-Type": "application/json",
+            },
+            method="POST",
+        )
+        with urllib.request.urlopen(req, timeout=20) as resp:
+            result = json.loads(resp.read().decode("utf-8"))
+            return {"id": result["id"], "url": result.get("url", ""), "title": title}
+    except urllib.error.HTTPError as exc:
+        detail = json.loads(exc.read().decode("utf-8")).get("message", "Notion API error")
+        raise HTTPException(status_code=exc.code, detail=detail)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
 
 
 @router.get("/{video_id}/chat", response_model=ChatHistoryResponse)

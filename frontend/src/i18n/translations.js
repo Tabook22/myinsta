@@ -167,6 +167,26 @@ export const translations = {
     notificationReady: (title) => `✅ "${title}" is ready!`,
     notificationBody: 'Your video has been transcribed. You can now chat with it.',
 
+    // ── Notion export ────────────────────────────────────────────────────────
+    notionExport:       'Notion',
+    notionSend:         'Send to Notion',
+    notionExporting:    'Sending…',
+    notionOpenPage:     'Open in Notion',
+    notionSettings:     'Notion settings',
+    notionSetupHint:    'Create a Notion integration at notion.so/my-integrations and share a database with it.',
+    notionApiKey:       'Integration Token',
+    notionDatabaseId:   'Database ID',
+    notionSaveSettings: 'Save',
+    notionPrivacyNote:  'Your API key is stored only in your browser — never sent to our server.',
+    cancel:             'Cancel',
+
+    // ── Quote card ────────────────────────────────────────────────────────────
+    quoteCreateCard:    'Create Quote Card',
+    quoteCardTitle:     'Quote Card',
+    quoteDownloadPng:   'Download PNG',
+    quoteHint:          '1080×1080 · ready for Instagram & social media',
+    quoteSelectionHint: '✨ Text selected — click "Create Quote Card" above',
+
     // ── Library pagination & export ───────────────────────────────────────────
     loadMore: 'Load more',
     loadingMore: 'Loading…',
@@ -385,6 +405,26 @@ export const translations = {
     // ── Notification ─────────────────────────────────────────────────────────
     notificationReady: (title) => `✅ "${title}" جاهز!`,
     notificationBody: 'تم نسخ الفيديو الخاص بك. يمكنك الآن التحدث معه.',
+
+    // ── Notion export ────────────────────────────────────────────────────────
+    notionExport:       'نوشن',
+    notionSend:         'إرسال إلى نوشن',
+    notionExporting:    'جارٍ الإرسال…',
+    notionOpenPage:     'فتح في نوشن',
+    notionSettings:     'إعدادات نوشن',
+    notionSetupHint:    'أنشئ تكاملاً في notion.so/my-integrations وشاركه مع قاعدة بيانات.',
+    notionApiKey:       'رمز التكامل',
+    notionDatabaseId:   'معرّف قاعدة البيانات',
+    notionSaveSettings: 'حفظ',
+    notionPrivacyNote:  'مفتاح API محفوظ في متصفحك فقط — لن يُرسل إلى خادمنا.',
+    cancel:             'إلغاء',
+
+    // ── Quote card ────────────────────────────────────────────────────────────
+    quoteCreateCard:    'إنشاء بطاقة اقتباس',
+    quoteCardTitle:     'بطاقة الاقتباس',
+    quoteDownloadPng:   'تحميل PNG',
+    quoteHint:          '١٠٨٠×١٠٨٠ · جاهزة لإنستاجرام ووسائل التواصل',
+    quoteSelectionHint: '✨ تم تحديد النص — انقر "إنشاء بطاقة اقتباس" أعلاه',
 
     // ── Library pagination & export ───────────────────────────────────────────
     loadMore: 'تحميل المزيد',

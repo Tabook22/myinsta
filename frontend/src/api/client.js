@@ -140,6 +140,13 @@ export function getChatHistory(videoId) {
   return request(`/api/videos/${videoId}/chat`)
 }
 
+export function exportToNotion(videoId, apiKey, databaseId) {
+  return request(`/api/videos/${videoId}/export-notion`, {
+    method: 'POST',
+    body: JSON.stringify({ api_key: apiKey, database_id: databaseId }),
+  })
+}
+
 export function getStats() {
   return request('/api/videos/stats')
 }

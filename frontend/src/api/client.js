@@ -14,21 +14,23 @@ function parseErrorMessage(text) {
   return text
 }
 
-const REQUEST_TIMEOUT_MS = 10_000 // 10 seconds — fail fast if backend is down
+const REQUEST_TIMEOUT_MS = 10_000 // 10 seconds - fail fast if backend is down
+const TRANSLATION_TIMEOUT_MS = 60_000 // Longer text can take a little while
 
 async function request(path, options = {}) {
+  const { timeoutMs = REQUEST_TIMEOUT_MS, ...fetchOptions } = options
   const controller = new AbortController()
-  const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
+  const timer = setTimeout(() => controller.abort(), timeoutMs)
 
   let response
   try {
     response = await fetch(`${API_BASE_URL}${path}`, {
       headers: {
         'Content-Type': 'application/json',
-        ...(options.headers ?? {}),
+        ...(fetchOptions.headers ?? {}),
       },
       signal: controller.signal,
-      ...options,
+      ...fetchOptions,
     })
   } catch (err) {
     if (err.name === 'AbortError') {
@@ -84,12 +86,14 @@ export function getVideo(videoId) {
 export function translateTranscriptToArabic(videoId) {
   return request(`/api/videos/${videoId}/translate`, {
     method: 'POST',
+    timeoutMs: TRANSLATION_TIMEOUT_MS,
   })
 }
 
 export function translateDescriptionToArabic(videoId) {
   return request(`/api/videos/${videoId}/translate-description`, {
     method: 'POST',
+    timeoutMs: TRANSLATION_TIMEOUT_MS,
   })
 }
 

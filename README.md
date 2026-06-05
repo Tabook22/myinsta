@@ -43,3 +43,36 @@ npm.cmd run dev
 ```
 
 Open http://localhost:5173.
+
+## VPS Deploy
+
+The live nginx config serves the frontend from:
+
+```text
+/opt/myinsta/frontend/dist/
+```
+
+Deploy from the VPS with:
+
+```bash
+cd ~/hermes-work/myinsta
+git reset --hard origin/main
+git pull origin main
+
+cd frontend
+npm install
+npm run build
+
+sudo mkdir -p /opt/myinsta/frontend/dist
+sudo rsync -a --delete dist/ /opt/myinsta/frontend/dist/
+
+sudo systemctl restart myinsta.service
+sudo systemctl restart nginx
+```
+
+Or run the helper script:
+
+```bash
+cd ~/hermes-work/myinsta
+bash scripts/deploy-vps.sh
+```

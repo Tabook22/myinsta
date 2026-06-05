@@ -45,6 +45,20 @@ npm run dev
 On Windows PowerShell, use `npm.cmd run build` or `npm.cmd run dev` if script
 execution policy blocks `npm.ps1`.
 
+VPS frontend deploy:
+
+```bash
+cd ~/hermes-work/myinsta
+git reset --hard origin/main
+git pull origin main
+cd frontend
+npm install
+npm run build
+sudo rsync -a --delete dist/ /opt/myinsta/frontend/dist/
+sudo systemctl restart nginx
+sudo systemctl restart myinsta.service
+```
+
 ## Next Work
 
 1. Add clearer user-facing failure messages for common yt-dlp, FFmpeg, and

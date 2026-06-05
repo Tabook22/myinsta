@@ -17,7 +17,8 @@ and asking simple transcript-grounded chat questions.
    - permanent storage under `backend/data/library/YYYY/MM/...`
 4. React UI for URL submission, processing status, saved library, local
    playback, transcript display, editing, deletion, and chat.
-5. Backend tests covering health, create/list/get, edit/delete/stream, and chat.
+5. Arabic transcript translation on demand, with the translated text cached in SQLite.
+6. Backend tests covering health, create/list/get, edit/delete/stream, translation, and chat.
 
 ## Local Verification
 

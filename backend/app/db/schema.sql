@@ -26,6 +26,7 @@ CREATE TABLE IF NOT EXISTS transcripts (
     video_id INTEGER NOT NULL UNIQUE,
     language TEXT,
     full_text TEXT NOT NULL DEFAULT '',
+    translation_ar TEXT,
     segments_json TEXT,
     created_at TEXT NOT NULL DEFAULT (datetime('now')),
     updated_at TEXT NOT NULL DEFAULT (datetime('now')),

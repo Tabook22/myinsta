@@ -171,7 +171,51 @@ def test_update_and_delete_video(client, monkeypatch, tmp_path):
     delete_response = client.delete(f"/api/videos/{video_id}")
     assert delete_response.status_code == 204
     assert client.get(f"/api/videos/{video_id}").status_code == 404
-    assert not folder.exists()
+    assert folder.exists()
+
+
+def test_translate_transcript_to_arabic(client, monkeypatch):
+    calls = []
+
+    def fake_translate(text: str, source_language: str | None = None) -> str:
+        calls.append((text, source_language))
+        return "مرحبا بالعالم"
+
+    monkeypatch.setattr(videos_routes, "translate_to_arabic", fake_translate)
+
+    with get_connection() as conn:
+        cursor = conn.execute(
+            """
+            INSERT INTO videos (source_url, status, title)
+            VALUES (?, ?, ?)
+            """,
+            ("https://www.instagram.com/reel/TRANSLATE/", "ready", "Translate test"),
+        )
+        video_id = cursor.lastrowid
+        conn.execute(
+            """
+            INSERT INTO transcripts (video_id, language, full_text, segments_json)
+            VALUES (?, ?, ?, ?)
+            """,
+            (video_id, "en", "Hello world", "[]"),
+        )
+
+    response = client.post(f"/api/videos/{video_id}/translate")
+    assert response.status_code == 200
+    assert response.json() == {
+        "video_id": video_id,
+        "target_language": "ar",
+        "translated_text": "مرحبا بالعالم",
+    }
+    assert calls == [("Hello world", "en")]
+
+    cached_response = client.post(f"/api/videos/{video_id}/translate")
+    assert cached_response.status_code == 200
+    assert len(calls) == 1
+
+    detail = client.get(f"/api/videos/{video_id}")
+    assert detail.status_code == 200
+    assert detail.json()["transcript"]["translation_ar"] == "مرحبا بالعالم"
 
 
 def test_chat_uses_transcript(client):
@@ -211,4 +255,3 @@ def test_chat_uses_transcript(client):
 
     history = client.get(f"/api/videos/{video_id}/chat")
     assert len(history.json()["messages"]) == 2
-

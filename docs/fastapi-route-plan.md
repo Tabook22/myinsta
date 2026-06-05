@@ -66,3 +66,15 @@ Future RAG behavior:
 3. Send prompt + chunks to an LLM.
 4. Save assistant response.
 5. Return answer with citations/timestamps.
+
+## `POST /api/videos/{video_id}/translate`
+
+Purpose: translate a ready transcript to Arabic.
+
+Behavior:
+
+1. Fetch the saved transcript for the video.
+2. Return cached Arabic text if it already exists.
+3. Translate the transcript to Arabic on demand.
+4. Save the Arabic translation on the transcript row.
+5. Return `video_id`, `target_language`, and `translated_text`.

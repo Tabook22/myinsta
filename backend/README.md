@@ -1,6 +1,6 @@
 # MyInsta Backend
 
-FastAPI backend for downloading Instagram videos, extracting audio, transcribing speech, and storing metadata/transcripts in SQLite.
+FastAPI backend for downloading Instagram videos, extracting audio, transcribing speech, translating transcripts to Arabic, and storing metadata/transcripts in SQLite.
 
 ## Setup
 
@@ -24,6 +24,12 @@ uv pip install --no-build-isolation -r requirements.txt
 ## API docs
 
 Open http://localhost:8000/docs after starting the server.
+
+## Transcript translation
+
+`POST /api/videos/{video_id}/translate` translates a ready transcript to Arabic
+and caches the result on the transcript row. The first request uses a lightweight
+web translation call; later requests return the saved Arabic text.
 
 ## Key folders
 

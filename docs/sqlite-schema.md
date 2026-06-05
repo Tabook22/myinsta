@@ -29,6 +29,7 @@ Important columns:
 - `video_id`: unique foreign key to `videos.id`
 - `language`: detected language from Whisper
 - `full_text`: complete transcript
+- `translation_ar`: cached Arabic translation of the transcript, generated on demand
 - `segments_json`: JSON array of timestamped Whisper segments
 
 ### `chat_messages`

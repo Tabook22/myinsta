@@ -22,8 +22,9 @@ Implemented:
 2. Download/process video locally with yt-dlp.
 3. Extract audio with FFmpeg.
 4. Transcribe speech with Whisper.
-5. Save media, metadata, transcript, and chat history in SQLite/local files.
-6. View, stream, edit, delete, and chat with saved videos.
+5. Translate saved transcripts to Arabic on demand.
+6. Save media, metadata, transcript, Arabic translation, and chat history in SQLite/local files.
+7. View, stream, edit, delete, and chat with saved videos.
 
 ## Run Locally
 

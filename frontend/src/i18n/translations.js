@@ -138,7 +138,12 @@ export const translations = {
 
     // ── Transcript actions ────────────────────────────────────────────────────
     copyTranscript: 'Copy transcript',
+    copyArabicTranscript: 'Copy Arabic',
     transcriptCopied: '✓ Copied!',
+    transcriptViewMode: 'Transcript view',
+    originalTranscript: 'Original',
+    arabicTranscript: 'Arabic',
+    translatingTranscript: 'Translating...',
 
     // ── Tags ─────────────────────────────────────────────────────────────────
     fieldTags: 'Tags',
@@ -377,7 +382,12 @@ export const translations = {
 
     // ── Transcript actions ────────────────────────────────────────────────────
     copyTranscript: 'نسخ النص',
+    copyArabicTranscript: 'نسخ العربية',
     transcriptCopied: '✓ تم النسخ!',
+    transcriptViewMode: 'طريقة عرض النص',
+    originalTranscript: 'الأصل',
+    arabicTranscript: 'العربية',
+    translatingTranscript: 'جارٍ الترجمة...',
 
     // ── Tags ─────────────────────────────────────────────────────────────────
     fieldTags: 'الوسوم',

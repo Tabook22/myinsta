@@ -23,6 +23,7 @@ class VideoUpdateRequest(BaseModel):
 class TranscriptResponse(BaseModel):
     language: str | None = None
     full_text: str = ""
+    translation_ar: str | None = None
     segments: list[dict[str, Any]] | None = None
 
 
@@ -78,3 +79,9 @@ class ChatResponse(BaseModel):
 class ChatHistoryResponse(BaseModel):
     video_id: int
     messages: list[ChatMessageResponse]
+
+
+class TranscriptTranslationResponse(BaseModel):
+    video_id: int
+    target_language: Literal["ar"]
+    translated_text: str

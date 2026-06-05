@@ -81,6 +81,12 @@ export function getVideo(videoId) {
   return request(`/api/videos/${videoId}`)
 }
 
+export function translateTranscriptToArabic(videoId) {
+  return request(`/api/videos/${videoId}/translate`, {
+    method: 'POST',
+  })
+}
+
 /** Returns all videos (legacy — used for backward compat, loads first page only) */
 export function listVideos() {
   return request('/api/videos?limit=20&offset=0')

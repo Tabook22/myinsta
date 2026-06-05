@@ -18,6 +18,7 @@ from app.models.video import (
     ChatRequest,
     ChatResponse,
     NotionExportRequest,
+    TranscriptTranslationResponse,
     VideoCreateRequest,
     VideoResponse,
     VideoUpdateRequest,
@@ -33,6 +34,7 @@ from app.services.library_storage import (
     update_transcript_file,
 )
 from app.services.transcriber import detect_content_type, transcribe_audio
+from app.services.translator import translate_to_arabic
 from app.services.video_downloader import download_video
 
 router = APIRouter(prefix="/videos", tags=["videos"])
@@ -61,6 +63,7 @@ def _row_to_video_response(row, transcript_row=None) -> VideoResponse:
         transcript = {
             "language": transcript_row["language"],
             "full_text": transcript_row["full_text"],
+            "translation_ar": transcript_row["translation_ar"] if "translation_ar" in transcript_row.keys() else None,
             "segments": segments,
         }
 
@@ -429,7 +432,7 @@ def update_video(video_id: int, payload: VideoUpdateRequest) -> VideoResponse:
             ).fetchone()
             if existing:
                 conn.execute(
-                    "UPDATE transcripts SET full_text = ? WHERE video_id = ?",
+                    "UPDATE transcripts SET full_text = ?, translation_ar = NULL WHERE video_id = ?",
                     (payload.transcript_text, video_id),
                 )
             else:
@@ -444,6 +447,59 @@ def update_video(video_id: int, payload: VideoUpdateRequest) -> VideoResponse:
                 update_transcript_file(Path(row["local_transcript_path"]), payload.transcript_text)
 
     return get_video(video_id)
+
+
+@router.post("/{video_id}/translate", response_model=TranscriptTranslationResponse)
+def translate_video_transcript(video_id: int) -> TranscriptTranslationResponse:
+    with get_connection() as conn:
+        row = conn.execute(
+            """
+            SELECT v.id, v.status, t.full_text, t.language, t.translation_ar
+            FROM videos v
+            LEFT JOIN transcripts t ON v.id = t.video_id
+            WHERE v.id = ? AND v.deleted_at IS NULL
+            """,
+            (video_id,),
+        ).fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="Video not found")
+        if row["status"] != "ready":
+            raise HTTPException(
+                status_code=400,
+                detail="Translation is available only after transcription finishes.",
+            )
+
+        cached = (row["translation_ar"] or "").strip() if "translation_ar" in row.keys() else ""
+        if cached:
+            return TranscriptTranslationResponse(
+                video_id=video_id,
+                target_language="ar",
+                translated_text=cached,
+            )
+
+        full_text = (row["full_text"] or "").strip() if row["full_text"] else ""
+        if not full_text:
+            raise HTTPException(status_code=400, detail="Transcript is empty.")
+
+    try:
+        translated_text = translate_to_arabic(full_text, row["language"])
+    except Exception as exc:
+        raise HTTPException(
+            status_code=502,
+            detail=f"Arabic translation failed: {exc}",
+        ) from exc
+
+    with get_connection() as conn:
+        conn.execute(
+            "UPDATE transcripts SET translation_ar = ? WHERE video_id = ?",
+            (translated_text, video_id),
+        )
+
+    return TranscriptTranslationResponse(
+        video_id=video_id,
+        target_language="ar",
+        translated_text=translated_text,
+    )
 
 
 @router.delete("/{video_id}", status_code=204)

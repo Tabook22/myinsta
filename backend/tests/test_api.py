@@ -218,6 +218,48 @@ def test_translate_transcript_to_arabic(client, monkeypatch):
     assert detail.json()["transcript"]["translation_ar"] == "مرحبا بالعالم"
 
 
+def test_translate_description_to_arabic(client, monkeypatch):
+    calls = []
+
+    def fake_translate(text: str, source_language: str | None = None) -> str:
+        calls.append((text, source_language))
+        return "AR description"
+
+    monkeypatch.setattr(videos_routes, "translate_to_arabic", fake_translate)
+
+    with get_connection() as conn:
+        cursor = conn.execute(
+            """
+            INSERT INTO videos (source_url, status, title, description)
+            VALUES (?, ?, ?, ?)
+            """,
+            (
+                "https://www.instagram.com/reel/DESCRIPTION/",
+                "ready",
+                "Description test",
+                "A short English description",
+            ),
+        )
+        video_id = cursor.lastrowid
+
+    response = client.post(f"/api/videos/{video_id}/translate-description")
+    assert response.status_code == 200
+    assert response.json() == {
+        "video_id": video_id,
+        "target_language": "ar",
+        "translated_text": "AR description",
+    }
+    assert calls == [("A short English description", None)]
+
+    cached_response = client.post(f"/api/videos/{video_id}/translate-description")
+    assert cached_response.status_code == 200
+    assert len(calls) == 1
+
+    detail = client.get(f"/api/videos/{video_id}")
+    assert detail.status_code == 200
+    assert detail.json()["description_translation_ar"] == "AR description"
+
+
 def test_chat_uses_transcript(client):
     with get_connection() as conn:
         cursor = conn.execute(

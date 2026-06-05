@@ -4,6 +4,7 @@ CREATE TABLE IF NOT EXISTS videos (
     platform TEXT NOT NULL DEFAULT 'instagram',
     title TEXT,
     description TEXT,
+    description_translation_ar TEXT,
     uploader TEXT,
     duration_seconds REAL,
     thumbnail_url TEXT,

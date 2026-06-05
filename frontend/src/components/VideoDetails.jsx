@@ -1,3 +1,5 @@
+import { useEffect, useState } from 'react'
+import { translateDescriptionToArabic } from '../api/client.js'
 import { useLanguage } from '../context/LanguageContext.jsx'
 import AudioPlayer from './AudioPlayer.jsx'
 import NotesEditor from './NotesEditor.jsx'
@@ -68,6 +70,39 @@ function CreatorCard({ video, allVideos }) {
 export default function VideoDetails({ video, allVideos = [] }) {
   const { t } = useLanguage()
   const duration = formatDuration(video.duration_seconds)
+  const [descriptionMode, setDescriptionMode] = useState('original')
+  const [arabicDescription, setArabicDescription] = useState(video.description_translation_ar || '')
+  const [isTranslatingDescription, setIsTranslatingDescription] = useState(false)
+  const [descriptionTranslationError, setDescriptionTranslationError] = useState('')
+
+  useEffect(() => {
+    setDescriptionMode('original')
+    setArabicDescription(video.description_translation_ar || '')
+    setDescriptionTranslationError('')
+  }, [video.id, video.description, video.description_translation_ar])
+
+  const displayedDescription =
+    descriptionMode === 'arabic' ? arabicDescription : video.description
+
+  async function handleShowArabicDescription() {
+    if (!video.description?.trim()) return
+    setDescriptionTranslationError('')
+    if (arabicDescription) {
+      setDescriptionMode('arabic')
+      return
+    }
+
+    setIsTranslatingDescription(true)
+    try {
+      const result = await translateDescriptionToArabic(video.id)
+      setArabicDescription(result.translated_text)
+      setDescriptionMode('arabic')
+    } catch (err) {
+      setDescriptionTranslationError(err.message)
+    } finally {
+      setIsTranslatingDescription(false)
+    }
+  }
 
   return (
     <section>
@@ -108,7 +143,38 @@ export default function VideoDetails({ video, allVideos = [] }) {
       </p>
 
       {video.description ? (
-        <p><strong>{t('labelDescription')}</strong> {video.description}</p>
+        <div className="description-block">
+          <div className="description-header">
+            <strong>{t('labelDescription')}</strong>
+            <div className="transcript-mode-toggle" aria-label={t('descriptionViewMode')}>
+              <button
+                type="button"
+                className={descriptionMode === 'original' ? 'transcript-mode-active' : ''}
+                onClick={() => setDescriptionMode('original')}
+              >
+                {t('originalTranscript')}
+              </button>
+              <button
+                type="button"
+                className={descriptionMode === 'arabic' ? 'transcript-mode-active' : ''}
+                onClick={handleShowArabicDescription}
+                disabled={isTranslatingDescription}
+              >
+                {isTranslatingDescription ? t('translatingDescription') : t('arabicTranscript')}
+              </button>
+            </div>
+          </div>
+          {descriptionTranslationError && (
+            <p className="error">{descriptionTranslationError}</p>
+          )}
+          <p
+            className="description-text"
+            dir={descriptionMode === 'arabic' ? 'rtl' : undefined}
+            lang={descriptionMode === 'arabic' ? 'ar' : undefined}
+          >
+            {displayedDescription}
+          </p>
+        </div>
       ) : null}
       {video.error_message ? (
         <p className="error">{video.error_message}</p>

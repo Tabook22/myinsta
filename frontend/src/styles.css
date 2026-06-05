@@ -178,6 +178,29 @@ button:disabled {
   font-family: "Noto Sans Arabic", "Cairo", "Tahoma", Arial, sans-serif;
 }
 
+.description-block {
+  margin: 14px 0;
+}
+
+.description-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 6px;
+}
+
+.description-text {
+  margin: 0;
+  white-space: pre-wrap;
+  line-height: 1.6;
+}
+
+.description-text[dir="rtl"] {
+  text-align: right;
+  font-family: "Noto Sans Arabic", "Cairo", "Tahoma", Arial, sans-serif;
+}
+
 .error {
   color: #b91c1c;
 }

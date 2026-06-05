@@ -33,6 +33,7 @@ class VideoResponse(BaseModel):
     platform: str
     title: str | None = None
     description: str | None = None
+    description_translation_ar: str | None = None
     uploader: str | None = None
     duration_seconds: float | None = None
     thumbnail_url: str | None = None
@@ -82,6 +83,12 @@ class ChatHistoryResponse(BaseModel):
 
 
 class TranscriptTranslationResponse(BaseModel):
+    video_id: int
+    target_language: Literal["ar"]
+    translated_text: str
+
+
+class DescriptionTranslationResponse(BaseModel):
     video_id: int
     target_language: Literal["ar"]
     translated_text: str

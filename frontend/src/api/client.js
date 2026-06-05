@@ -87,6 +87,12 @@ export function translateTranscriptToArabic(videoId) {
   })
 }
 
+export function translateDescriptionToArabic(videoId) {
+  return request(`/api/videos/${videoId}/translate-description`, {
+    method: 'POST',
+  })
+}
+
 /** Returns all videos (legacy — used for backward compat, loads first page only) */
 export function listVideos() {
   return request('/api/videos?limit=20&offset=0')

@@ -17,6 +17,7 @@ from app.models.video import (
     ChatMessageResponse,
     ChatRequest,
     ChatResponse,
+    DescriptionTranslationResponse,
     NotionExportRequest,
     TranscriptTranslationResponse,
     VideoCreateRequest,
@@ -76,6 +77,7 @@ def _row_to_video_response(row, transcript_row=None) -> VideoResponse:
         platform=row["platform"],
         title=row["title"],
         description=row["description"],
+        description_translation_ar=row["description_translation_ar"] if "description_translation_ar" in row.keys() else None,
         uploader=row["uploader"],
         duration_seconds=row["duration_seconds"],
         thumbnail_url=row["thumbnail_url"],
@@ -408,6 +410,7 @@ def update_video(video_id: int, payload: VideoUpdateRequest) -> VideoResponse:
             metadata_updates["title"] = payload.title
         if payload.description is not None:
             updates["description"] = payload.description
+            updates["description_translation_ar"] = None
             metadata_updates["description"] = payload.description
         if payload.notes is not None:
             updates["notes"] = payload.notes
@@ -447,6 +450,57 @@ def update_video(video_id: int, payload: VideoUpdateRequest) -> VideoResponse:
                 update_transcript_file(Path(row["local_transcript_path"]), payload.transcript_text)
 
     return get_video(video_id)
+
+
+@router.post("/{video_id}/translate-description", response_model=DescriptionTranslationResponse)
+def translate_video_description(video_id: int) -> DescriptionTranslationResponse:
+    with get_connection() as conn:
+        row = conn.execute(
+            """
+            SELECT id, description, description_translation_ar
+            FROM videos
+            WHERE id = ? AND deleted_at IS NULL
+            """,
+            (video_id,),
+        ).fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="Video not found")
+
+        cached = (
+            (row["description_translation_ar"] or "").strip()
+            if "description_translation_ar" in row.keys()
+            else ""
+        )
+        if cached:
+            return DescriptionTranslationResponse(
+                video_id=video_id,
+                target_language="ar",
+                translated_text=cached,
+            )
+
+        description = (row["description"] or "").strip()
+        if not description:
+            raise HTTPException(status_code=400, detail="Description is empty.")
+
+    try:
+        translated_text = translate_to_arabic(description)
+    except Exception as exc:
+        raise HTTPException(
+            status_code=502,
+            detail=f"Arabic description translation failed: {exc}",
+        ) from exc
+
+    with get_connection() as conn:
+        conn.execute(
+            "UPDATE videos SET description_translation_ar = ? WHERE id = ?",
+            (translated_text, video_id),
+        )
+
+    return DescriptionTranslationResponse(
+        video_id=video_id,
+        target_language="ar",
+        translated_text=translated_text,
+    )
 
 
 @router.post("/{video_id}/translate", response_model=TranscriptTranslationResponse)

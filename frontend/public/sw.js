@@ -3,7 +3,7 @@
  * Strategy: network-first for navigation, cache-first for static assets.
  * API calls are always passed through to the network.
  */
-const CACHE = 'myinsta-v1'
+const CACHE = 'myinsta-v3'
 const SHELL = ['/myinsta/', '/myinsta/index.html']
 
 // ── Install: cache the app shell ──────────────────────────────────────────
@@ -22,6 +22,10 @@ self.addEventListener('activate', (e) => {
   self.clients.claim()
 })
 
+self.addEventListener('message', (e) => {
+  if (e.data?.type === 'SKIP_WAITING') self.skipWaiting()
+})
+
 // ── Fetch ─────────────────────────────────────────────────────────────────
 self.addEventListener('fetch', (e) => {
   const { request } = e
@@ -38,17 +42,17 @@ self.addEventListener('fetch', (e) => {
     return
   }
 
-  // Static assets: cache first, then network + update cache
+  // Static assets: network first, then cached fallback. This avoids serving
+  // stale JS/CSS after a VPS deploy.
   e.respondWith(
-    caches.match(request).then((cached) => {
-      const networkFetch = fetch(request).then((res) => {
+    fetch(request)
+      .then((res) => {
         if (res.ok) {
           const clone = res.clone()
           caches.open(CACHE).then((c) => c.put(request, clone))
         }
         return res
       })
-      return cached || networkFetch
-    })
+      .catch(() => caches.match(request))
   )
 })

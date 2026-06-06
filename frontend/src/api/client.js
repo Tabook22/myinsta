@@ -1,4 +1,11 @@
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000'
+function getDefaultApiBaseUrl() {
+  if (typeof window !== 'undefined' && window.location.pathname.startsWith('/myinsta')) {
+    return '/myinsta-api'
+  }
+  return 'http://localhost:8000'
+}
+
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? getDefaultApiBaseUrl()
 
 function parseErrorMessage(text) {
   if (!text) return 'Request failed'

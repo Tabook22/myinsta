@@ -54,13 +54,78 @@ function groupByMonth(videos, locale) {
     const key = `${d.getUTCFullYear()}-${d.getUTCMonth()}`
     if (!groups.has(key)) {
       groups.set(key, {
+        key,
         label: d.toLocaleString(locale, { month: 'long', timeZone: 'UTC' }) + ' ' + d.getUTCFullYear(),
         items: [],
+        duration: 0,
       })
     }
     groups.get(key).items.push(v)
+    groups.get(key).duration += v.duration_seconds || 0
   }
   return Array.from(groups.values())
+}
+
+function monthKey(date) {
+  return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}`
+}
+
+function groupByYearMonth(videos, locale) {
+  const years = new Map()
+  for (const video of videos) {
+    const date = parseDate(video.created_at)
+    const yearKey = String(date.getUTCFullYear())
+    const month = monthKey(date)
+    if (!years.has(yearKey)) {
+      years.set(yearKey, {
+        key: yearKey,
+        label: yearKey,
+        items: [],
+        months: new Map(),
+        duration: 0,
+      })
+    }
+    const year = years.get(yearKey)
+    if (!year.months.has(month)) {
+      year.months.set(month, {
+        key: month,
+        label: date.toLocaleString(locale, { month: 'long', year: 'numeric', timeZone: 'UTC' }),
+        items: [],
+        duration: 0,
+      })
+    }
+    const monthGroup = year.months.get(month)
+    const duration = video.duration_seconds || 0
+    year.items.push(video)
+    year.duration += duration
+    monthGroup.items.push(video)
+    monthGroup.duration += duration
+  }
+
+  return Array.from(years.values()).map((year) => ({
+    ...year,
+    months: Array.from(year.months.values()),
+  }))
+}
+
+function formatDurationTotal(seconds) {
+  if (!seconds) return '0m'
+  const h = Math.floor(seconds / 3600)
+  const m = Math.round((seconds % 3600) / 60)
+  return h > 0 ? `${h}h ${m}m` : `${m}m`
+}
+
+function searchText(video) {
+  return [
+    video.title,
+    video.description,
+    video.uploader,
+    video.storage_stamp,
+    video.storage_folder,
+    video.status,
+    video.content_type,
+    ...(video.tags || []),
+  ].filter(Boolean).join(' ').toLowerCase()
 }
 
 // ── Tag chips (reusable inline) ───────────────────────────────────────────────
@@ -84,7 +149,10 @@ function TagChips({ tags, activeTag, onTagClick, size = 'sm' }) {
 }
 
 // ── Grid card ─────────────────────────────────────────────────────────────────
-function VideoCard({ item, selected, onSelect, onView, onEdit, onDelete, activeTag, onTagClick, t, locale }) {
+function VideoCard({
+  item, selected, favorite, onSelect, onView, onEdit, onDelete, onToggleFavorite,
+  activeTag, onTagClick, t, locale,
+}) {
   const [isHovering, setIsHovering] = useState(false)
   const hoverTimer  = useRef(null)
   const videoUrl    = getVideoStreamUrl(item)
@@ -110,6 +178,16 @@ function VideoCard({ item, selected, onSelect, onView, onEdit, onDelete, activeT
         onClick={(e) => e.stopPropagation()}
         aria-label={`Select ${item.title || item.id}`}
       />
+
+      <button
+        type="button"
+        className={`favorite-btn${favorite ? ' favorite-btn-active' : ''}`}
+        onClick={(e) => { e.stopPropagation(); onToggleFavorite(item.id) }}
+        title={favorite ? t('favoriteRemove') : t('favoriteAdd')}
+        aria-label={favorite ? t('favoriteRemove') : t('favoriteAdd')}
+      >
+        {favorite ? '★' : '☆'}
+      </button>
 
       {/* Thumbnail / preview */}
       <div className="lib-card-thumb" onClick={() => onView(item.id)}>
@@ -140,6 +218,9 @@ function VideoCard({ item, selected, onSelect, onView, onEdit, onDelete, activeT
         <p className="lib-card-title" onClick={() => onView(item.id)} title={item.title}>
           {item.title || t('videoHash', item.id)}
         </p>
+        {item.description && (
+          <p className="lib-card-description">{item.description}</p>
+        )}
         <TagChips tags={item.tags} activeTag={activeTag} onTagClick={onTagClick} />
         <p className="lib-card-date">{formatDate(item.created_at, locale)}</p>
       </div>
@@ -178,9 +259,15 @@ function VideoCard({ item, selected, onSelect, onView, onEdit, onDelete, activeT
 }
 
 // ── Action icon buttons for table rows ───────────────────────────────────────
-function RowActions({ item, onView, onEdit, onDelete, t }) {
+function RowActions({ item, favorite, onView, onEdit, onDelete, onToggleFavorite, t }) {
   return (
     <div className="library-actions">
+      <button type="button"
+        className={`icon-btn icon-btn-favorite${favorite ? ' icon-btn-favorite-active' : ''}`}
+        title={favorite ? t('favoriteRemove') : t('favoriteAdd')}
+        onClick={() => onToggleFavorite(item.id)}>
+        {favorite ? '★' : '☆'}
+      </button>
       <button type="button" className="icon-btn icon-btn-view" title={t('view')} onClick={() => onView(item.id)}>
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
           stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -219,9 +306,20 @@ export default function VideoLibrary({
   // Persistent preferences
   const [viewMode, setViewMode] = useState(() => localStorage.getItem('lib-view') || 'list')
   const [sortBy,   setSortBy]   = useState(() => localStorage.getItem('lib-sort') || 'newest')
+  const [favoriteIds, setFavoriteIds] = useState(() => {
+    try { return new Set(JSON.parse(localStorage.getItem('lib-favorites') || '[]')) }
+    catch { return new Set() }
+  })
+  const [collapsedGroups, setCollapsedGroups] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('lib-collapsed-groups') || '{}') }
+    catch { return {} }
+  })
 
   // Transient state
   const [activeTag,      setActiveTag]      = useState(null)
+  const [searchQuery,    setSearchQuery]    = useState('')
+  const [quickFilter,    setQuickFilter]    = useState('all')
+  const [creatorFilter,  setCreatorFilter]  = useState('all')
   const [selectedIds,    setSelectedIds]    = useState(new Set())
   const [batchTagInput,  setBatchTagInput]  = useState('')
   const [showBatchTag,   setShowBatchTag]   = useState(false)
@@ -238,11 +336,33 @@ export default function VideoLibrary({
     return Array.from(s).sort()
   }, [videos])
 
+  const creators = useMemo(() => {
+    const counts = new Map()
+    videos.forEach((v) => {
+      if (!v.uploader) return
+      counts.set(v.uploader, (counts.get(v.uploader) || 0) + 1)
+    })
+    return Array.from(counts.entries())
+      .sort((a, b) => a[0].localeCompare(b[0]))
+      .map(([name, count]) => ({ name, count }))
+  }, [videos])
+
   // Apply tag filter → sort → group
   const filtered = useMemo(() => {
-    const base = activeTag ? videos.filter((v) => (v.tags || []).includes(activeTag)) : videos
+    const query = searchQuery.trim().toLowerCase()
+    const base = videos.filter((v) => {
+      if (activeTag && !(v.tags || []).includes(activeTag)) return false
+      if (creatorFilter !== 'all' && v.uploader !== creatorFilter) return false
+      if (quickFilter === 'favorites' && !favoriteIds.has(v.id)) return false
+      if (quickFilter === 'ready' && v.status !== 'ready') return false
+      if (quickFilter === 'failed' && v.status !== 'failed') return false
+      if (quickFilter === 'speech' && v.content_type !== 'speech') return false
+      if (quickFilter === 'music' && v.content_type !== 'music') return false
+      if (query && !searchText(v).includes(query)) return false
+      return true
+    })
     return sortVideos(base, sortBy)
-  }, [videos, activeTag, sortBy])
+  }, [videos, activeTag, creatorFilter, favoriteIds, quickFilter, searchQuery, sortBy])
 
   const grouped = useMemo(() => groupByMonth(filtered, locale), [filtered, locale])
 
@@ -250,6 +370,23 @@ export default function VideoLibrary({
   function changeView(mode) { setViewMode(mode); localStorage.setItem('lib-view', mode) }
   function changeSort(s)    { setSortBy(s);   localStorage.setItem('lib-sort', s);
                               setSelectedIds(new Set()) }
+
+  function toggleFavorite(id) {
+    setFavoriteIds((prev) => {
+      const next = new Set(prev)
+      next.has(id) ? next.delete(id) : next.add(id)
+      localStorage.setItem('lib-favorites', JSON.stringify(Array.from(next)))
+      return next
+    })
+  }
+
+  function toggleCollapsed(key) {
+    setCollapsedGroups((prev) => {
+      const next = { ...prev, [key]: !prev[key] }
+      localStorage.setItem('lib-collapsed-groups', JSON.stringify(next))
+      return next
+    })
+  }
 
   // ── Selection helpers ──────────────────────────────────────────────────────
   function toggleSelect(id) {
@@ -403,6 +540,42 @@ export default function VideoLibrary({
       </div>
 
       {/* ── Tag filter bar ── */}
+      <div className="library-discovery-bar">
+        <input
+          type="search"
+          className="library-search-input"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          placeholder={t('librarySearchPlaceholder')}
+        />
+        <select
+          className="lib-sort-select"
+          value={creatorFilter}
+          onChange={(e) => setCreatorFilter(e.target.value)}
+          title={t('creatorFilter')}
+        >
+          <option value="all">{t('allCreators')}</option>
+          {creators.map((creator) => (
+            <option key={creator.name} value={creator.name}>
+              @{creator.name} ({creator.count})
+            </option>
+          ))}
+        </select>
+      </div>
+
+      <div className="quick-filter-bar">
+        {['all', 'ready', 'failed', 'speech', 'music', 'favorites'].map((filter) => (
+          <button
+            key={filter}
+            type="button"
+            className={`quick-filter-btn${quickFilter === filter ? ' quick-filter-btn-active' : ''}`}
+            onClick={() => setQuickFilter(filter)}
+          >
+            {t(`filter${filter.charAt(0).toUpperCase()}${filter.slice(1)}`)}
+          </button>
+        ))}
+      </div>
+
       {allTags.length > 0 && (
         <div className="tag-filter-bar">
           <button type="button"
@@ -469,10 +642,12 @@ export default function VideoLibrary({
               key={item.id}
               item={item}
               selected={selectedIds.has(item.id)}
+              favorite={favoriteIds.has(item.id)}
               onSelect={toggleSelect}
               onView={onView}
               onEdit={onEdit}
               onDelete={handleDelete}
+              onToggleFavorite={toggleFavorite}
               activeTag={activeTag}
               onTagClick={(tag) => setActiveTag(activeTag === tag ? null : tag)}
               t={t}
@@ -485,7 +660,15 @@ export default function VideoLibrary({
       {/* ── List (table) view ── */}
       {viewMode === 'list' && filtered.length > 0 && grouped.map((group, gi) => (
         <div key={gi} className="library-group">
-          <h4>{group.label}</h4>
+          <button type="button" className="library-month-toggle"
+            onClick={() => toggleCollapsed(`month-${group.key}`)}>
+            <span className="library-toggle-caret">{collapsedGroups[`month-${group.key}`] ? '+' : '-'}</span>
+            <span>{group.label}</span>
+            <span className="library-group-meta">
+              {t('groupSummary', group.items.length, formatDurationTotal(group.duration))}
+            </span>
+          </button>
+          {!collapsedGroups[`month-${group.key}`] && (
           <div className="library-table-wrap">
             <table className="library-table">
               <thead>
@@ -532,6 +715,9 @@ export default function VideoLibrary({
                       )}
                       <div className="library-title-stack">
                         <span className="library-title-text">{item.title || t('videoHash', item.id)}</span>
+                        {item.description && (
+                          <span className="library-description-preview">{item.description}</span>
+                        )}
                         <TagChips tags={item.tags} activeTag={activeTag}
                           onTagClick={(tag) => setActiveTag(activeTag === tag ? null : tag)} />
                       </div>
@@ -556,12 +742,23 @@ export default function VideoLibrary({
                       ) : null}
                     </td>
                     <td className="library-date-cell">{formatDate(item.created_at, locale)}</td>
-                    <td><RowActions item={item} onView={onView} onEdit={onEdit} onDelete={handleDelete} t={t} /></td>
+                    <td>
+                      <RowActions
+                        item={item}
+                        favorite={favoriteIds.has(item.id)}
+                        onView={onView}
+                        onEdit={onEdit}
+                        onDelete={handleDelete}
+                        onToggleFavorite={toggleFavorite}
+                        t={t}
+                      />
+                    </td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
+          )}
         </div>
       ))}
 

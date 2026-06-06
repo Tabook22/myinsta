@@ -637,6 +637,50 @@ button:disabled {
   white-space: nowrap;
 }
 
+.library-status-heading {
+  width: 72px;
+  text-align: center !important;
+}
+
+.library-status-cell {
+  width: 72px;
+  text-align: center !important;
+  white-space: nowrap;
+}
+
+.library-status-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  font-size: 14px;
+  font-weight: 900;
+  line-height: 1;
+  vertical-align: middle;
+}
+
+.library-status-icon-ready {
+  background: #dcfce7;
+  color: #15803d;
+}
+
+.library-status-icon-failed {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+.library-status-icon-processing {
+  background: #fef3c7;
+  color: #b45309;
+}
+
+.library-status-icon-queued {
+  background: #e2e8f0;
+  color: #475569;
+}
+
 .library-actions {
   display: flex;
   align-items: center;
@@ -2231,10 +2275,12 @@ kbd {
 /* Duration badge in table */
 .library-duration {
   display: inline-block;
-  margin-left: 6px;
+  margin-left: 5px;
   font-size: 11px;
   color: #94a3b8;
   font-variant-numeric: tabular-nums;
+  vertical-align: middle;
+  white-space: nowrap;
 }
 
 /* Selected row highlight in table */

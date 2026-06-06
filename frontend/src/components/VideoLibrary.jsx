@@ -128,6 +128,16 @@ function searchText(video) {
   ].filter(Boolean).join(' ').toLowerCase()
 }
 
+function StatusIcon({ status }) {
+  const label = status || 'unknown'
+  const symbol = status === 'ready' ? '✓' : status === 'failed' ? '!' : status === 'processing' ? '…' : '•'
+  return (
+    <span className={`library-status-icon library-status-icon-${label}`} title={label} aria-label={label}>
+      {symbol}
+    </span>
+  )
+}
+
 // ── Tag chips (reusable inline) ───────────────────────────────────────────────
 function TagChips({ tags, activeTag, onTagClick, size = 'sm' }) {
   if (!tags?.length) return null
@@ -689,7 +699,7 @@ export default function VideoLibrary({
                   </th>
                   <th>{t('colTitle')}</th>
                   <th>{t('colSavedAs')}</th>
-                  <th>{t('colStatus')}</th>
+                  <th className="library-status-heading">{t('colStatus')}</th>
                   <th>{t('colDate')}</th>
                   <th>{t('colActions')}</th>
                 </tr>
@@ -735,8 +745,8 @@ export default function VideoLibrary({
                       )}
                     </td>
                     <td className="library-stamp-cell">{item.storage_stamp || '—'}</td>
-                    <td>
-                      <span className="status">{item.status}</span>
+                    <td className="library-status-cell">
+                      <StatusIcon status={item.status} />
                       {item.duration_seconds ? (
                         <span className="library-duration">{formatDuration(item.duration_seconds)}</span>
                       ) : null}

@@ -35,8 +35,12 @@ backend:
 YOUTUBE_COOKIES_FROM_BROWSER=chrome
 ```
 
-Use `edge` or `firefox` instead if that is where you are signed in. On a VPS,
-export a YouTube `cookies.txt` file from your browser and set:
+Use `edge` or `firefox` instead if that is where you are signed in. Do not use
+browser-cookie mode on a Hostinger VPS unless that server has a real logged-in
+browser profile.
+
+On a VPS, export a YouTube `cookies.txt` file from your local browser, copy it
+to the server, and set this in `backend/.env`:
 
 ```text
 YOUTUBE_COOKIES_FILE=/home/nasser/.config/myinsta/youtube_cookies.txt

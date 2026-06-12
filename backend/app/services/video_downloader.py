@@ -1,4 +1,3 @@
-import os
 from pathlib import Path
 
 import yt_dlp
@@ -30,11 +29,11 @@ def _check_duration(info: dict, platform: str) -> None:
 
 
 def _apply_cookie_options(ydl_opts: dict, platform: str) -> None:
-    cookies_file = os.getenv("INSTAGRAM_COOKIES_FILE")
+    cookies_file = settings.instagram_cookies_file
     if platform == "youtube":
-        cookies_file = os.getenv("YOUTUBE_COOKIES_FILE") or cookies_file
+        cookies_file = settings.youtube_cookies_file or cookies_file
 
-        browser = os.getenv("YOUTUBE_COOKIES_FROM_BROWSER", "").strip().lower()
+        browser = settings.youtube_cookies_from_browser.strip().lower()
         if browser:
             ydl_opts["cookiesfrombrowser"] = (browser,)
             return

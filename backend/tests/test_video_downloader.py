@@ -1,7 +1,7 @@
 from app.services import video_downloader
 from app.services.video_downloader import (
     _apply_cookie_options,
-    _format_selector_for,
+    _format_selectors_for,
     _friendly_download_error,
 )
 
@@ -23,16 +23,18 @@ def test_youtube_format_error_is_actionable():
         "youtube",
     )
 
-    assert "broader YouTube format selector" in message
-    assert "restart the backend" in message
+    assert "downloadable media format" in message
+    assert "refreshing your YouTube cookies file" in message
 
 
-def test_youtube_uses_broader_format_selector():
-    selector = _format_selector_for("youtube")
+def test_youtube_uses_multiple_format_selectors():
+    selectors = _format_selectors_for("youtube")
 
-    assert "bv*" in selector
-    assert "ba" in selector
-    assert _format_selector_for("instagram") == "best[ext=mp4]/best"
+    assert "bestvideo" in selectors[0]
+    assert "bestaudio" in selectors[0]
+    assert "best" in selectors
+    assert selectors[-1] is None
+    assert _format_selectors_for("instagram") == ["best[ext=mp4]/best"]
 
 
 def test_youtube_cookie_file_setting_is_used(monkeypatch, tmp_path):

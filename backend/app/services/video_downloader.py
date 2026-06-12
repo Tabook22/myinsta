@@ -42,15 +42,15 @@ def _apply_cookie_options(ydl_opts: dict, platform: str) -> None:
         ydl_opts["cookiefile"] = cookies_file
 
 
-def _format_selector_for(platform: str) -> str:
+def _format_selectors_for(platform: str) -> list[str | None]:
     if platform == "youtube":
-        return (
-            "bv*[ext=mp4]+ba[ext=m4a]/"
-            "bv*+ba/"
-            "b[ext=mp4]/"
-            "b"
-        )
-    return "best[ext=mp4]/best"
+        return [
+            "bestvideo[ext=mp4]+bestaudio[ext=m4a]/bestvideo+bestaudio/best[ext=mp4]/best",
+            "bestvideo+bestaudio/best",
+            "best",
+            None,
+        ]
+    return ["best[ext=mp4]/best"]
 
 
 def _friendly_download_error(error: Exception, platform: str) -> str:
@@ -68,9 +68,8 @@ def _friendly_download_error(error: Exception, platform: str) -> str:
         )
     if platform == "youtube" and "Requested format is not available" in message:
         return (
-            "YouTube did not provide the requested media format for this video. "
-            "The downloader now uses a broader YouTube format selector; pull the "
-            "latest code and restart the backend, then submit the video again."
+            "YouTube did not provide a downloadable media format for this video. "
+            "Try refreshing your YouTube cookies file, then submit the video again."
         )
     return f"Video download failed: {message}"
 
@@ -82,7 +81,6 @@ def download_video(url: str, output_dir: Path, video_id: int, platform: str = "i
 
     ydl_opts = {
         "outtmpl": output_template,
-        "format": _format_selector_for(platform),
         "merge_output_format": "mp4",
         "quiet": True,
         "noprogress": True,
@@ -97,28 +95,36 @@ def download_video(url: str, output_dir: Path, video_id: int, platform: str = "i
     _apply_cookie_options(ydl_opts, platform)
 
     last_error = None
-    for attempt in range(2):
-        try:
-            if attempt:
-                _clear_partial_downloads(output_dir, video_id)
-            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                info = ydl.extract_info(url, download=False)
-                if info is None:
-                    raise RuntimeError("no metadata returned")
-                _check_duration(info, platform)
-                info = ydl.extract_info(url, download=True)
-                if info is None:
-                    raise RuntimeError("no metadata returned")
-                _check_duration(info, platform)
+    local_path = None
+    for selector_index, selector in enumerate(_format_selectors_for(platform)):
+        current_opts = dict(ydl_opts)
+        if selector:
+            current_opts["format"] = selector
 
-                local_path = Path(ydl.prepare_filename(info))
+        for attempt in range(2):
+            try:
+                if selector_index or attempt:
+                    _clear_partial_downloads(output_dir, video_id)
+                with yt_dlp.YoutubeDL(current_opts) as ydl:
+                    info = ydl.extract_info(url, download=False)
+                    if info is None:
+                        raise RuntimeError("no metadata returned")
+                    _check_duration(info, platform)
+                    info = ydl.extract_info(url, download=True)
+                    if info is None:
+                        raise RuntimeError("no metadata returned")
+                    _check_duration(info, platform)
+
+                    local_path = Path(ydl.prepare_filename(info))
+                break
+            except Exception as exc:
+                last_error = exc
+        if local_path:
             break
-        except Exception as exc:
-            last_error = exc
     else:
         raise RuntimeError(_friendly_download_error(last_error, platform)) from last_error
 
-    if not local_path.exists():
+    if not local_path or not local_path.exists():
         matches = sorted(output_dir.glob(f"{video_id}.*"))
         if not matches:
             raise RuntimeError("Video download failed: output file not found")

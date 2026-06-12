@@ -42,6 +42,13 @@ def _apply_cookie_options(ydl_opts: dict, platform: str) -> None:
         ydl_opts["cookiefile"] = cookies_file
 
 
+def _apply_youtube_runtime_options(ydl_opts: dict, platform: str) -> None:
+    if platform != "youtube":
+        return
+
+    ydl_opts["js_runtimes"] = ["node"]
+
+
 def _cookie_status_for(platform: str) -> str:
     if platform != "youtube":
         return ""
@@ -120,6 +127,7 @@ def download_video(url: str, output_dir: Path, video_id: int, platform: str = "i
     }
 
     _apply_cookie_options(ydl_opts, platform)
+    _apply_youtube_runtime_options(ydl_opts, platform)
 
     last_error = None
     local_path = None

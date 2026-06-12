@@ -46,13 +46,14 @@ to the server, and set this in `backend/.env`:
 YOUTUBE_COOKIES_FILE=/home/nasser/.config/myinsta/youtube_cookies.txt
 ```
 
-YouTube also changes its player code often. If yt-dlp shows `nsig extraction
-failed` or only lists storyboard/image formats, upgrade yt-dlp inside the
+YouTube also changes its player code often. If yt-dlp shows `n challenge
+solving failed` or only lists storyboard/image formats, make sure Node.js is
+installed and upgrade yt-dlp with its default EJS solver package inside the
 backend virtualenv:
 
 ```bash
 cd /opt/myinsta/backend
-.venv/bin/python -m pip install --upgrade yt-dlp
+.venv/bin/python -m pip install --upgrade "yt-dlp[default]"
 sudo systemctl restart myinsta.service
 ```
 

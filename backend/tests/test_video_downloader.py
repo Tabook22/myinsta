@@ -1,6 +1,7 @@
 from app.services import video_downloader
 from app.services.video_downloader import (
     _apply_cookie_options,
+    _apply_youtube_runtime_options,
     _extractor_args_for,
     _format_selectors_for,
     _friendly_download_error,
@@ -45,6 +46,20 @@ def test_youtube_uses_multiple_extractor_clients():
     assert args[1]["youtube"]["player_client"] == ["ios"]
     assert args[-1] is None
     assert _extractor_args_for("instagram") == [None]
+
+
+def test_youtube_enables_node_runtime():
+    ydl_opts = {}
+    _apply_youtube_runtime_options(ydl_opts, "youtube")
+
+    assert ydl_opts["js_runtimes"] == ["node"]
+
+
+def test_instagram_does_not_set_js_runtime():
+    ydl_opts = {}
+    _apply_youtube_runtime_options(ydl_opts, "instagram")
+
+    assert "js_runtimes" not in ydl_opts
 
 
 def test_youtube_cookie_file_setting_is_used(monkeypatch, tmp_path):

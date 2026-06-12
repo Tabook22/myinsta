@@ -1,6 +1,7 @@
 from app.services import video_downloader
 from app.services.video_downloader import (
     _apply_cookie_options,
+    _extractor_args_for,
     _format_selectors_for,
     _friendly_download_error,
 )
@@ -24,7 +25,7 @@ def test_youtube_format_error_is_actionable():
     )
 
     assert "downloadable media format" in message
-    assert "refreshing your YouTube cookies file" in message
+    assert "updating yt-dlp" in message
 
 
 def test_youtube_uses_multiple_format_selectors():
@@ -35,6 +36,15 @@ def test_youtube_uses_multiple_format_selectors():
     assert "best" in selectors
     assert selectors[-1] is None
     assert _format_selectors_for("instagram") == ["best[ext=mp4]/best"]
+
+
+def test_youtube_uses_multiple_extractor_clients():
+    args = _extractor_args_for("youtube")
+
+    assert args[0]["youtube"]["player_client"] == ["android"]
+    assert args[1]["youtube"]["player_client"] == ["ios"]
+    assert args[-1] is None
+    assert _extractor_args_for("instagram") == [None]
 
 
 def test_youtube_cookie_file_setting_is_used(monkeypatch, tmp_path):

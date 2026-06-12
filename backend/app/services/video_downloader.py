@@ -69,6 +69,17 @@ def _format_selectors_for(platform: str) -> list[str | None]:
     return ["best[ext=mp4]/best"]
 
 
+def _extractor_args_for(platform: str) -> list[dict | None]:
+    if platform == "youtube":
+        return [
+            {"youtube": {"player_client": ["android"]}},
+            {"youtube": {"player_client": ["ios"]}},
+            {"youtube": {"player_client": ["android", "ios"]}},
+            None,
+        ]
+    return [None]
+
+
 def _friendly_download_error(error: Exception, platform: str) -> str:
     message = str(error)
     if platform == "youtube" and (
@@ -85,7 +96,7 @@ def _friendly_download_error(error: Exception, platform: str) -> str:
     if platform == "youtube" and "Requested format is not available" in message:
         return (
             "YouTube did not provide a downloadable media format for this video. "
-            "Try refreshing your YouTube cookies file, then submit the video again."
+            "Try refreshing your YouTube cookies file or updating yt-dlp, then submit the video again."
         )
     return f"Video download failed: {message}"
 
@@ -112,29 +123,34 @@ def download_video(url: str, output_dir: Path, video_id: int, platform: str = "i
 
     last_error = None
     local_path = None
-    for selector_index, selector in enumerate(_format_selectors_for(platform)):
-        current_opts = dict(ydl_opts)
-        if selector:
-            current_opts["format"] = selector
+    for extractor_index, extractor_args in enumerate(_extractor_args_for(platform)):
+        for selector_index, selector in enumerate(_format_selectors_for(platform)):
+            current_opts = dict(ydl_opts)
+            if extractor_args:
+                current_opts["extractor_args"] = extractor_args
+            if selector:
+                current_opts["format"] = selector
 
-        for attempt in range(2):
-            try:
-                if selector_index or attempt:
-                    _clear_partial_downloads(output_dir, video_id)
-                with yt_dlp.YoutubeDL(current_opts) as ydl:
-                    info = ydl.extract_info(url, download=False)
-                    if info is None:
-                        raise RuntimeError("no metadata returned")
-                    _check_duration(info, platform)
-                    info = ydl.extract_info(url, download=True)
-                    if info is None:
-                        raise RuntimeError("no metadata returned")
-                    _check_duration(info, platform)
+            for attempt in range(2):
+                try:
+                    if extractor_index or selector_index or attempt:
+                        _clear_partial_downloads(output_dir, video_id)
+                    with yt_dlp.YoutubeDL(current_opts) as ydl:
+                        info = ydl.extract_info(url, download=False)
+                        if info is None:
+                            raise RuntimeError("no metadata returned")
+                        _check_duration(info, platform)
+                        info = ydl.extract_info(url, download=True)
+                        if info is None:
+                            raise RuntimeError("no metadata returned")
+                        _check_duration(info, platform)
 
-                    local_path = Path(ydl.prepare_filename(info))
+                        local_path = Path(ydl.prepare_filename(info))
+                    break
+                except Exception as exc:
+                    last_error = exc
+            if local_path:
                 break
-            except Exception as exc:
-                last_error = exc
         if local_path:
             break
     else:

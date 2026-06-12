@@ -12,18 +12,19 @@ Response:
 
 ## `POST /api/videos`
 
-Purpose: submit an Instagram video URL and start processing.
+Purpose: submit an Instagram or YouTube video URL and start processing.
 
 Request:
 
 ```json
-{ "url": "https://www.instagram.com/reel/..." }
+{ "url": "https://www.youtube.com/watch?v=..." }
 ```
 
 Prototype behavior:
 
 1. Validate URL with Pydantic.
-2. Insert a row into `videos` with `status = processing`.
+2. Detect the supported source platform and insert a row into `videos` with
+   `status = processing`.
 3. Start processing in a FastAPI `BackgroundTasks` job.
 4. Return the video record.
 
@@ -57,7 +58,9 @@ Response includes:
 
 Purpose: chat with a video transcript.
 
-V1 behavior: placeholder answer.
+Current behavior: save the user message, answer from the transcript or web mode,
+and optionally return the answer in English, Arabic, or bilingual mode with
+`answer_language`.
 
 Future RAG behavior:
 
@@ -78,3 +81,23 @@ Behavior:
 3. Translate the transcript to Arabic on demand.
 4. Save the Arabic translation on the transcript row.
 5. Return `video_id`, `target_language`, and `translated_text`.
+
+## `POST /api/videos/{video_id}/cleanup`
+
+Purpose: clean a ready transcript into more readable text.
+
+Query:
+
+```text
+target_language=en | ar
+```
+
+Behavior:
+
+1. Fetch the saved transcript and Whisper segments.
+2. Return cached cleaned text if it already exists.
+3. Remove immediate repeated words/phrases.
+4. Add simple punctuation and paragraph breaks.
+5. Preserve speaker labels when segment metadata includes them.
+6. For `target_language=ar`, translate the cleaned text to Arabic.
+7. Save the cleaned English or cleaned Arabic text on the transcript row.

@@ -6,6 +6,7 @@ from pydantic import BaseModel, HttpUrl
 VideoStatus = Literal["queued", "processing", "ready", "failed"]
 ContentType = Literal["speech", "music", "unknown"]
 ChatMode = Literal["transcript", "web"]
+ChatAnswerLanguage = Literal["english", "arabic", "bilingual"]
 
 
 class VideoCreateRequest(BaseModel):
@@ -24,6 +25,8 @@ class TranscriptResponse(BaseModel):
     language: str | None = None
     full_text: str = ""
     translation_ar: str | None = None
+    cleaned_text: str | None = None
+    cleaned_translation_ar: str | None = None
     segments: list[dict[str, Any]] | None = None
 
 
@@ -62,6 +65,7 @@ class NotionExportRequest(BaseModel):
 class ChatRequest(BaseModel):
     message: str
     mode: ChatMode = "transcript"
+    answer_language: ChatAnswerLanguage = "english"
 
 
 class ChatMessageResponse(BaseModel):
@@ -86,6 +90,12 @@ class TranscriptTranslationResponse(BaseModel):
     video_id: int
     target_language: Literal["ar"]
     translated_text: str
+
+
+class TranscriptCleanupResponse(BaseModel):
+    video_id: int
+    target_language: Literal["en", "ar"]
+    cleaned_text: str
 
 
 class DescriptionTranslationResponse(BaseModel):

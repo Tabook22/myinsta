@@ -97,6 +97,13 @@ export function translateTranscriptToArabic(videoId) {
   })
 }
 
+export function cleanTranscript(videoId, targetLanguage = 'en') {
+  return request(`/api/videos/${videoId}/cleanup?target_language=${encodeURIComponent(targetLanguage)}`, {
+    method: 'POST',
+    timeoutMs: TRANSLATION_TIMEOUT_MS,
+  })
+}
+
 export function translateDescriptionToArabic(videoId) {
   return request(`/api/videos/${videoId}/translate-description`, {
     method: 'POST',
@@ -152,10 +159,10 @@ export function deleteVideo(videoId) {
   })
 }
 
-export function chatWithVideo(videoId, message, mode = 'transcript') {
+export function chatWithVideo(videoId, message, mode = 'transcript', answerLanguage = 'english') {
   return request(`/api/videos/${videoId}/chat`, {
     method: 'POST',
-    body: JSON.stringify({ message, mode }),
+    body: JSON.stringify({ message, mode, answer_language: answerLanguage }),
   })
 }
 

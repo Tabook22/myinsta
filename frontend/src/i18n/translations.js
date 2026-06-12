@@ -7,7 +7,7 @@ export const translations = {
   en: {
     // ── App ──────────────────────────────────────────────────────────────────
     appName: 'MyInsta',
-    appSubtitle: 'Paste an Instagram video link, save it to your library, transcribe it, then chat with the transcript.',
+    appSubtitle: 'Paste an Instagram or YouTube link, save it to your library, transcribe it, then chat with the transcript.',
     langLabel: 'Language',
 
     // ── Backend / connection ─────────────────────────────────────────────────
@@ -16,14 +16,14 @@ export const translations = {
     connectingToServer: 'Connecting to server…',
 
     // ── URL form ─────────────────────────────────────────────────────────────
-    urlPlaceholder: 'https://www.instagram.com/reel/...',
+    urlPlaceholder: 'Instagram or YouTube video URL',
     processVideo: 'Process video',
     submitting: 'Submitting...',
 
     // ── Video library ────────────────────────────────────────────────────────
-    yourVideos: 'Your Instagram videos',
+    yourVideos: 'Your saved videos',
     librarySubtitle: 'View, edit, or delete any saved video from your library.',
-    noVideos: 'No saved videos yet. Paste an Instagram link above to get started.',
+    noVideos: 'No saved videos yet. Paste an Instagram or YouTube link above to get started.',
     colTitle: 'Title',
     colSavedAs: 'Saved as',
     colStatus: 'Status',
@@ -34,7 +34,10 @@ export const translations = {
     delete: 'Delete',
     deleteConfirm: (label) => `Delete "${label}" and all saved files?`,
     videoHash: (id) => `Video #${id}`,
-    openOnInstagram: (name) => `Open ${name} on Instagram`,
+    openOnSource: (name, source) => `Open ${name} on ${source}`,
+    sourceInstagram: 'Instagram',
+    sourceYoutube: 'YouTube',
+    sourceUnknown: 'Source',
     creator: 'creator',
 
     // ── Video details ────────────────────────────────────────────────────────
@@ -67,6 +70,13 @@ export const translations = {
     chatWithVideo: 'Chat with video',
     modeTranscript: '🎯 Transcript',
     modeWeb: '🌐 Web',
+    answerLanguage: 'Answer language',
+    answerEnglish: 'English',
+    answerArabic: 'Arabic',
+    answerBilingual: 'Bilingual',
+    answerEnglishTitle: 'Answer in English',
+    answerArabicTitle: 'Answer in Arabic',
+    answerBilingualTitle: 'Answer in English and Arabic',
     titleTranscript: 'Answer questions using the video transcript',
     titleWeb: 'Search the web to answer your question',
     noticeMusicWarning: '⚠️ This video appears to be music only — transcript may be empty.',
@@ -143,7 +153,9 @@ export const translations = {
     transcriptViewMode: 'Transcript view',
     descriptionViewMode: 'Description view',
     originalTranscript: 'Original',
+    cleanTranscript: 'Cleaned',
     arabicTranscript: 'Arabic',
+    cleaningTranscript: 'Cleaning...',
     translatingTranscript: 'Translating...',
     translatingDescription: 'Translating...',
 
@@ -156,6 +168,8 @@ export const translations = {
     filterSpeech: 'Speech',
     filterMusic: 'Music',
     filterFavorites: 'Favorites',
+    filterInstagram: 'Instagram',
+    filterYoutube: 'YouTube',
     librarySearchPlaceholder: 'Search title, creator, description, tags...',
     creatorFilter: 'Creator filter',
     allCreators: 'All creators',
@@ -172,8 +186,8 @@ export const translations = {
 
     // ── Onboarding ────────────────────────────────────────────────────────────
     onboardingTitle: 'Welcome to MyInsta!',
-    onboardingSubtitle: 'Your personal Instagram video library. Here\'s how it works:',
-    onboardingStep1Title: 'Paste any Instagram link',
+    onboardingSubtitle: 'Your personal video memory library. Here\'s how it works:',
+    onboardingStep1Title: 'Paste a supported video link',
     onboardingStep1Desc: 'Drop a reel or video URL into the box — we download it automatically.',
     onboardingStep2Title: 'AI transcribes it for you',
     onboardingStep2Desc: 'Whisper AI extracts the audio and turns it into a searchable transcript.',
@@ -264,7 +278,7 @@ export const translations = {
   ar: {
     // ── App ──────────────────────────────────────────────────────────────────
     appName: 'ماي إنستا',
-    appSubtitle: 'الصق رابط فيديو إنستاجرام، احفظه في مكتبتك، استخرج نصه، ثم تحدث معه.',
+    appSubtitle: 'الصق رابط فيديو من إنستاجرام أو يوتيوب، احفظه في مكتبتك، استخرج نصه، ثم تحدث معه.',
     langLabel: 'اللغة',
 
     // ── Backend / connection ─────────────────────────────────────────────────
@@ -273,14 +287,14 @@ export const translations = {
     connectingToServer: 'جارٍ الاتصال بالخادم…',
 
     // ── URL form ─────────────────────────────────────────────────────────────
-    urlPlaceholder: 'https://www.instagram.com/reel/...',
+    urlPlaceholder: 'رابط فيديو من إنستاجرام أو يوتيوب',
     processVideo: 'معالجة الفيديو',
     submitting: 'جارٍ الإرسال...',
 
     // ── Video library ────────────────────────────────────────────────────────
     yourVideos: 'مقاطع الفيديو الخاصة بك',
     librarySubtitle: 'اعرض أو عدّل أو احذف أي فيديو محفوظ من مكتبتك.',
-    noVideos: 'لا توجد مقاطع فيديو بعد. الصق رابط إنستاجرام أعلاه للبدء.',
+    noVideos: 'لا توجد مقاطع فيديو بعد. الصق رابط إنستاجرام أو يوتيوب أعلاه للبدء.',
     colTitle: 'العنوان',
     colSavedAs: 'محفوظ كـ',
     colStatus: 'الحالة',
@@ -291,7 +305,10 @@ export const translations = {
     delete: 'حذف',
     deleteConfirm: (label) => `هل تريد حذف "${label}" وجميع الملفات المحفوظة؟`,
     videoHash: (id) => `فيديو #${id}`,
-    openOnInstagram: (name) => `فتح ${name} على إنستاجرام`,
+    openOnSource: (name, source) => `فتح ${name} على ${source}`,
+    sourceInstagram: 'إنستاجرام',
+    sourceYoutube: 'يوتيوب',
+    sourceUnknown: 'المصدر',
     creator: 'المبدع',
 
     // ── Video details ────────────────────────────────────────────────────────
@@ -324,6 +341,13 @@ export const translations = {
     chatWithVideo: 'الدردشة مع الفيديو',
     modeTranscript: '🎯 النص',
     modeWeb: '🌐 الويب',
+    answerLanguage: 'لغة الإجابة',
+    answerEnglish: 'الإنجليزية',
+    answerArabic: 'العربية',
+    answerBilingual: 'ثنائي',
+    answerEnglishTitle: 'الإجابة بالإنجليزية',
+    answerArabicTitle: 'الإجابة بالعربية',
+    answerBilingualTitle: 'الإجابة بالإنجليزية والعربية',
     titleTranscript: 'الإجابة بناءً على نص الفيديو',
     titleWeb: 'البحث في الويب للإجابة على سؤالك',
     noticeMusicWarning: '⚠️ يبدو أن هذا الفيديو موسيقى فقط — قد يكون النص فارغاً.',
@@ -400,7 +424,9 @@ export const translations = {
     transcriptViewMode: 'طريقة عرض النص',
     descriptionViewMode: 'طريقة عرض الوصف',
     originalTranscript: 'الأصل',
+    cleanTranscript: 'منقح',
     arabicTranscript: 'العربية',
+    cleaningTranscript: 'جارٍ التنقيح...',
     translatingTranscript: 'جارٍ الترجمة...',
     translatingDescription: 'جارٍ الترجمة...',
 
@@ -413,6 +439,8 @@ export const translations = {
     filterSpeech: 'كلام',
     filterMusic: 'موسيقى',
     filterFavorites: 'المفضلة',
+    filterInstagram: 'إنستاجرام',
+    filterYoutube: 'يوتيوب',
     librarySearchPlaceholder: 'ابحث في العنوان أو المبدع أو الوصف أو الوسوم...',
     creatorFilter: 'تصفية حسب المبدع',
     allCreators: 'كل المبدعين',
@@ -429,8 +457,8 @@ export const translations = {
 
     // ── Onboarding ────────────────────────────────────────────────────────────
     onboardingTitle: 'مرحباً بك في ماي إنستا!',
-    onboardingSubtitle: 'مكتبتك الشخصية لمقاطع إنستاجرام. إليك كيفية عملها:',
-    onboardingStep1Title: 'الصق أي رابط إنستاجرام',
+    onboardingSubtitle: 'مكتبتك الشخصية لذاكرة الفيديو. إليك كيفية عملها:',
+    onboardingStep1Title: 'الصق رابط فيديو مدعوماً',
     onboardingStep1Desc: 'أسقط رابط مقطع أو فيديو في الصندوق — سنحمّله تلقائياً.',
     onboardingStep2Title: 'الذكاء الاصطناعي ينسخه لك',
     onboardingStep2Desc: 'يستخرج Whisper الصوت ويحوّله إلى نص قابل للبحث.',

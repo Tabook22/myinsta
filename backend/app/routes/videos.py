@@ -6,6 +6,7 @@ import re
 import urllib.error
 import urllib.request
 from pathlib import Path
+from urllib.parse import urlparse
 
 from fastapi import APIRouter, BackgroundTasks, HTTPException, Response
 from fastapi.responses import FileResponse
@@ -19,6 +20,7 @@ from app.models.video import (
     ChatResponse,
     DescriptionTranslationResponse,
     NotionExportRequest,
+    TranscriptCleanupResponse,
     TranscriptTranslationResponse,
     VideoCreateRequest,
     VideoResponse,
@@ -27,6 +29,7 @@ from app.models.video import (
 from app.services.audio_extractor import extract_audio, extract_audio_mp3
 from app.services.video_compressor import compress_video
 from app.services.chat_service import answer_from_transcript
+from app.services.transcript_cleanup import clean_transcript_text
 from app.services.web_search import search_web
 from app.services.library_storage import (
     delete_library_folder,
@@ -65,6 +68,8 @@ def _row_to_video_response(row, transcript_row=None) -> VideoResponse:
             "language": transcript_row["language"],
             "full_text": transcript_row["full_text"],
             "translation_ar": transcript_row["translation_ar"] if "translation_ar" in transcript_row.keys() else None,
+            "cleaned_text": transcript_row["cleaned_text"] if "cleaned_text" in transcript_row.keys() else None,
+            "cleaned_translation_ar": transcript_row["cleaned_translation_ar"] if "cleaned_translation_ar" in transcript_row.keys() else None,
             "segments": segments,
         }
 
@@ -99,9 +104,16 @@ def _row_to_video_response(row, transcript_row=None) -> VideoResponse:
     )
 
 
-def _validate_instagram_url(url: str) -> None:
-    if "instagram.com" not in url.lower():
-        raise HTTPException(status_code=400, detail="URL must be an Instagram link")
+def _detect_supported_platform(url: str) -> str:
+    host = urlparse(url).netloc.lower().removeprefix("www.")
+    if host == "instagram.com" or host.endswith(".instagram.com"):
+        return "instagram"
+    if host in {"youtube.com", "youtu.be"} or host.endswith(".youtube.com"):
+        return "youtube"
+    raise HTTPException(
+        status_code=400,
+        detail="URL must be an Instagram or YouTube link.",
+    )
 
 
 def _mark_video_failed(video_id: int, error_message: str) -> None:
@@ -117,12 +129,13 @@ def process_video(video_id: int) -> None:
     try:
         with get_connection() as conn:
             row = conn.execute(
-                "SELECT source_url FROM videos WHERE id = ?",
+                "SELECT source_url, platform FROM videos WHERE id = ?",
                 (video_id,),
             ).fetchone()
             if not row:
                 return
             source_url = row["source_url"]
+            platform = row["platform"] or _detect_supported_platform(source_url)
             conn.execute(
                 "UPDATE videos SET status = ?, processing_step = ? WHERE id = ?",
                 ("processing", "downloading", video_id),
@@ -132,6 +145,7 @@ def process_video(video_id: int) -> None:
             source_url,
             settings.download_path,
             video_id,
+            platform,
         )
 
         # Optional compression (large files only — silently skipped on failure)
@@ -181,6 +195,7 @@ def process_video(video_id: int) -> None:
                 "thumbnail_url": download_result["thumbnail_url"],
                 "description": download_result["description"],
                 "video_id": video_id,
+                "platform": platform,
             },
         )
 
@@ -196,7 +211,7 @@ def process_video(video_id: int) -> None:
                 WHERE id = ?
                 """,
                 (
-                    "instagram",
+                    platform,
                     download_result["title"],
                     download_result["description"],
                     download_result["uploader"],
@@ -235,12 +250,12 @@ def process_video(video_id: int) -> None:
 @router.post("", response_model=VideoResponse, status_code=201)
 def create_video(payload: VideoCreateRequest, background_tasks: BackgroundTasks) -> VideoResponse:
     url = str(payload.url)
-    _validate_instagram_url(url)
+    platform = _detect_supported_platform(url)
 
     with get_connection() as conn:
         cursor = conn.execute(
-            "INSERT INTO videos (source_url, status) VALUES (?, ?)",
-            (url, "processing"),
+            "INSERT INTO videos (source_url, platform, status) VALUES (?, ?, ?)",
+            (url, platform, "processing"),
         )
         video_id = cursor.lastrowid
 
@@ -435,7 +450,12 @@ def update_video(video_id: int, payload: VideoUpdateRequest) -> VideoResponse:
             ).fetchone()
             if existing:
                 conn.execute(
-                    "UPDATE transcripts SET full_text = ?, translation_ar = NULL WHERE video_id = ?",
+                    """
+                    UPDATE transcripts
+                    SET full_text = ?, translation_ar = NULL, cleaned_text = NULL,
+                        cleaned_translation_ar = NULL
+                    WHERE video_id = ?
+                    """,
                     (payload.transcript_text, video_id),
                 )
             else:
@@ -554,6 +574,97 @@ def translate_video_transcript(video_id: int) -> TranscriptTranslationResponse:
         target_language="ar",
         translated_text=translated_text,
     )
+
+
+@router.post("/{video_id}/cleanup", response_model=TranscriptCleanupResponse)
+def clean_video_transcript(video_id: int, target_language: str = "en") -> TranscriptCleanupResponse:
+    if target_language not in {"en", "ar"}:
+        raise HTTPException(status_code=400, detail="target_language must be 'en' or 'ar'.")
+
+    with get_connection() as conn:
+        row = conn.execute(
+            """
+            SELECT v.id, v.status, t.full_text, t.language, t.segments_json,
+                   t.cleaned_text, t.cleaned_translation_ar
+            FROM videos v
+            LEFT JOIN transcripts t ON v.id = t.video_id
+            WHERE v.id = ? AND v.deleted_at IS NULL
+            """,
+            (video_id,),
+        ).fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="Video not found")
+        if row["status"] != "ready":
+            raise HTTPException(
+                status_code=400,
+                detail="Transcript cleanup is available only after transcription finishes.",
+            )
+
+        cached_column = "cleaned_translation_ar" if target_language == "ar" else "cleaned_text"
+        cached = (row[cached_column] or "").strip() if cached_column in row.keys() else ""
+        if cached:
+            return TranscriptCleanupResponse(
+                video_id=video_id,
+                target_language=target_language,
+                cleaned_text=cached,
+            )
+
+        full_text = (row["full_text"] or "").strip() if row["full_text"] else ""
+        if not full_text:
+            raise HTTPException(status_code=400, detail="Transcript is empty.")
+        segments = json.loads(row["segments_json"]) if row["segments_json"] else None
+
+    try:
+        cleaned_text = clean_transcript_text(full_text, segments)
+        output_text = (
+            translate_to_arabic(cleaned_text, row["language"])
+            if target_language == "ar"
+            else cleaned_text
+        )
+    except Exception as exc:
+        action = "Arabic transcript cleanup" if target_language == "ar" else "Transcript cleanup"
+        raise HTTPException(status_code=502, detail=f"{action} failed: {exc}") from exc
+
+    with get_connection() as conn:
+        if target_language == "ar":
+            conn.execute(
+                """
+                UPDATE transcripts
+                SET cleaned_text = COALESCE(cleaned_text, ?),
+                    cleaned_translation_ar = ?
+                WHERE video_id = ?
+                """,
+                (cleaned_text, output_text, video_id),
+            )
+        else:
+            conn.execute(
+                "UPDATE transcripts SET cleaned_text = ? WHERE video_id = ?",
+                (output_text, video_id),
+            )
+
+    return TranscriptCleanupResponse(
+        video_id=video_id,
+        target_language=target_language,
+        cleaned_text=output_text,
+    )
+
+
+def _format_chat_answer_language(answer: str, answer_language: str) -> str:
+    if answer_language == "english":
+        return answer
+
+    try:
+        arabic_answer = translate_to_arabic(answer)
+    except Exception as exc:
+        raise HTTPException(
+            status_code=502,
+            detail=f"Arabic chat translation failed: {exc}",
+        ) from exc
+
+    if answer_language == "arabic":
+        return arabic_answer
+
+    return f"English:\n{answer}\n\nArabic:\n{arabic_answer}"
 
 
 @router.delete("/{video_id}", status_code=204)
@@ -796,6 +907,8 @@ def chat_with_video(video_id: int, payload: ChatRequest) -> ChatResponse:
             )
         else:
             answer = answer_from_transcript(message, full_text, segments)
+
+        answer = _format_chat_answer_language(answer, payload.answer_language)
 
         conn.execute(
             "INSERT INTO chat_messages (video_id, role, content) VALUES (?, ?, ?)",

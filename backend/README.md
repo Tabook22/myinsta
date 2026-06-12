@@ -1,6 +1,6 @@
 # MyInsta Backend
 
-FastAPI backend for downloading Instagram videos, extracting audio, transcribing speech, translating transcripts to Arabic, and storing metadata/transcripts in SQLite.
+FastAPI backend for downloading Instagram and YouTube videos, extracting audio, transcribing speech, cleaning Whisper transcripts, translating transcripts to Arabic, and storing metadata/transcripts in SQLite.
 
 ## Setup
 
@@ -25,11 +25,20 @@ uv pip install --no-build-isolation -r requirements.txt
 
 Open http://localhost:8000/docs after starting the server.
 
-## Transcript translation
+## Transcript and chat translation
+
+`POST /api/videos/{video_id}/cleanup?target_language=en` cleans a ready
+transcript into readable English and caches it on the transcript row.
+`target_language=ar` translates that cleaned version into readable Arabic and
+caches it separately.
 
 `POST /api/videos/{video_id}/translate` translates a ready transcript to Arabic
 and caches the result on the transcript row. The first request uses a lightweight
 web translation call; later requests return the saved Arabic text.
+
+`POST /api/videos/{video_id}/chat` accepts `answer_language` as `english`,
+`arabic`, or `bilingual`. Arabic and bilingual chat answers translate the
+grounded transcript/web answer before saving the assistant message.
 
 ## Key folders
 

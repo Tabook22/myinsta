@@ -1,7 +1,7 @@
 # MyInsta
 
-Local-first app for saving Instagram videos, extracting speech transcripts, and
-chatting with the saved transcript text.
+Local-first app for saving Instagram and YouTube videos, extracting speech transcripts, and
+chatting with the saved transcript text in English, Arabic, or bilingual mode.
 
 ## Stack
 
@@ -18,13 +18,20 @@ Working local MVP.
 
 Implemented:
 
-1. Paste an Instagram Reel/Post URL.
+1. Paste an Instagram Reel/Post URL or a YouTube video URL.
 2. Download/process video locally with yt-dlp.
 3. Extract audio with FFmpeg.
 4. Transcribe speech with Whisper.
-5. Translate saved transcripts to Arabic on demand.
-6. Save media, metadata, transcript, Arabic translation, and chat history in SQLite/local files.
-7. View, stream, edit, delete, and chat with saved videos.
+5. Clean Whisper transcripts into more readable English or Arabic.
+6. Translate saved transcripts to Arabic on demand.
+7. Save media, metadata, transcript, cleaned text, Arabic translation, and chat history in SQLite/local files.
+8. View, stream, edit, delete, and chat with saved videos.
+9. Ask chat questions with English, Arabic, or bilingual answer modes.
+
+YouTube support is intentionally guarded for the MVP: videos longer than 30
+minutes are rejected by default to keep downloads, Whisper transcription, and
+translation practical. Set `MYINSTA_MAX_YOUTUBE_DURATION_SECONDS` to adjust the
+limit.
 
 ## Run Locally
 

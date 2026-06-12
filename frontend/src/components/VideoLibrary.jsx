@@ -120,12 +120,19 @@ function searchText(video) {
     video.title,
     video.description,
     video.uploader,
+    video.platform,
     video.storage_stamp,
     video.storage_folder,
     video.status,
     video.content_type,
     ...(video.tags || []),
   ].filter(Boolean).join(' ').toLowerCase()
+}
+
+function sourceLabel(platform, t) {
+  if (platform === 'instagram') return t('sourceInstagram')
+  if (platform === 'youtube') return t('sourceYoutube')
+  return t('sourceUnknown')
 }
 
 function StatusIcon({ status }) {
@@ -225,6 +232,9 @@ function VideoCard({
 
       {/* Body */}
       <div className="lib-card-body">
+        <span className={`source-badge source-badge-${item.platform || 'unknown'}`}>
+          {sourceLabel(item.platform, t)}
+        </span>
         <p className="lib-card-title" onClick={() => onView(item.id)} title={item.title}>
           {item.title || t('videoHash', item.id)}
         </p>
@@ -368,6 +378,8 @@ export default function VideoLibrary({
       if (quickFilter === 'failed' && v.status !== 'failed') return false
       if (quickFilter === 'speech' && v.content_type !== 'speech') return false
       if (quickFilter === 'music' && v.content_type !== 'music') return false
+      if (quickFilter === 'instagram' && v.platform !== 'instagram') return false
+      if (quickFilter === 'youtube' && v.platform !== 'youtube') return false
       if (query && !searchText(v).includes(query)) return false
       return true
     })
@@ -574,7 +586,7 @@ export default function VideoLibrary({
       </div>
 
       <div className="quick-filter-bar">
-        {['all', 'ready', 'failed', 'speech', 'music', 'favorites'].map((filter) => (
+        {['all', 'ready', 'failed', 'speech', 'music', 'instagram', 'youtube', 'favorites'].map((filter) => (
           <button
             key={filter}
             type="button"
@@ -725,6 +737,9 @@ export default function VideoLibrary({
                       )}
                       <div className="library-title-stack">
                         <span className="library-title-text">{item.title || t('videoHash', item.id)}</span>
+                        <span className={`source-badge source-badge-${item.platform || 'unknown'}`}>
+                          {sourceLabel(item.platform, t)}
+                        </span>
                         {item.description && (
                           <span className="library-description-preview">{item.description}</span>
                         )}
@@ -733,13 +748,13 @@ export default function VideoLibrary({
                       </div>
                       {item.creator_url && (
                         <a className="insta-link" href={item.creator_url} target="_blank" rel="noreferrer"
-                          title={t('openOnInstagram', item.uploader || t('creator'))}
+                          title={t('openOnSource', item.uploader || t('creator'), sourceLabel(item.platform, t))}
                           onClick={(e) => e.stopPropagation()}>
                           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
                             stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                            <rect x="2" y="2" width="20" height="20" rx="5" ry="5"/>
-                            <circle cx="12" cy="12" r="4"/>
-                            <circle cx="17.5" cy="6.5" r="1" fill="currentColor" stroke="none"/>
+                            <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
+                            <polyline points="15 3 21 3 21 9"/>
+                            <line x1="10" y1="14" x2="21" y2="3"/>
                           </svg>
                         </a>
                       )}

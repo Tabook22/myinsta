@@ -16,6 +16,8 @@ MIGRATIONS = [
     "ALTER TABLE videos ADD COLUMN deleted_at TEXT",      # NULL = active, timestamp = soft-deleted
     "ALTER TABLE videos ADD COLUMN processing_step TEXT", # downloading | extracting | transcribing
     "ALTER TABLE transcripts ADD COLUMN translation_ar TEXT",
+    "ALTER TABLE transcripts ADD COLUMN cleaned_text TEXT",
+    "ALTER TABLE transcripts ADD COLUMN cleaned_translation_ar TEXT",
     "ALTER TABLE videos ADD COLUMN description_translation_ar TEXT",
 ]
 

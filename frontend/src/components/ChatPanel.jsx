@@ -14,6 +14,7 @@ export default function ChatPanel({ video }) {
   const [isSending, setIsSending]           = useState(false)
   const [isLoadingHistory, setIsLoadingHistory] = useState(false)
   const [mode, setMode]                     = useState(() => defaultMode(video))
+  const [answerLanguage, setAnswerLanguage] = useState('english')
   const messagesEndRef = useRef(null)
 
   const isReady     = video.status === 'ready'
@@ -57,7 +58,7 @@ export default function ChatPanel({ video }) {
       { id: `pending-user-${Date.now()}`, role: 'user', content: outgoing, created_at: new Date().toISOString() },
     ])
     try {
-      await chatWithVideo(video.id, outgoing, mode)
+      await chatWithVideo(video.id, outgoing, mode, answerLanguage)
       const history = await getChatHistory(video.id)
       setMessages(history.messages)
     } catch (err) {
@@ -88,6 +89,33 @@ export default function ChatPanel({ video }) {
             title={t('titleWeb')}
             disabled={!isReady}>
             {t('modeWeb')}
+          </button>
+        </div>
+      </div>
+
+      <div className="chat-language-row">
+        <span className="chat-language-label">{t('answerLanguage')}</span>
+        <div className="chat-mode-toggle chat-language-toggle" role="group" aria-label={t('answerLanguage')}>
+          <button type="button"
+            className={`chat-mode-btn ${answerLanguage === 'english' ? 'chat-mode-btn-active' : ''}`}
+            onClick={() => setAnswerLanguage('english')}
+            title={t('answerEnglishTitle')}
+            disabled={!isReady}>
+            {t('answerEnglish')}
+          </button>
+          <button type="button"
+            className={`chat-mode-btn ${answerLanguage === 'arabic' ? 'chat-mode-btn-active' : ''}`}
+            onClick={() => setAnswerLanguage('arabic')}
+            title={t('answerArabicTitle')}
+            disabled={!isReady}>
+            {t('answerArabic')}
+          </button>
+          <button type="button"
+            className={`chat-mode-btn ${answerLanguage === 'bilingual' ? 'chat-mode-btn-active' : ''}`}
+            onClick={() => setAnswerLanguage('bilingual')}
+            title={t('answerBilingualTitle')}
+            disabled={!isReady}>
+            {t('answerBilingual')}
           </button>
         </div>
       </div>

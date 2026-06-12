@@ -6,13 +6,13 @@ Source of truth: `backend/app/db/schema.sql`
 
 ### `videos`
 
-One row per submitted Instagram URL.
+One row per submitted Instagram or YouTube URL.
 
 Important columns:
 
 - `id`: primary key
 - `source_url`: original user-submitted URL
-- `platform`: defaults to `instagram`
+- `platform`: detected source, currently `instagram` or `youtube`
 - `title`, `description`, `uploader`, `duration_seconds`, `thumbnail_url`: metadata from yt-dlp
 - `local_video_path`: downloaded video path
 - `local_audio_path`: extracted audio path
@@ -30,6 +30,8 @@ Important columns:
 - `language`: detected language from Whisper
 - `full_text`: complete transcript
 - `translation_ar`: cached Arabic translation of the transcript, generated on demand
+- `cleaned_text`: cached readable transcript with repeated words reduced, punctuation, and paragraphs
+- `cleaned_translation_ar`: cached Arabic translation of the cleaned transcript
 - `segments_json`: JSON array of timestamped Whisper segments
 
 ### `chat_messages`

@@ -12,6 +12,7 @@ class Settings(BaseSettings):
     cors_origins: str = "http://localhost:5173,http://127.0.0.1:5173"
     whisper_model: str = "base"
     brave_search_api_key: str = ""   # Get free key at brave.com/search/api/
+    max_youtube_duration_seconds: int = 1800
 
     model_config = SettingsConfigDict(
         env_file=".env",

@@ -27,6 +27,12 @@ function avatarColor(name) {
   return AVATAR_COLORS[Math.abs(h) % AVATAR_COLORS.length]
 }
 
+function sourceLabel(platform, t) {
+  if (platform === 'instagram') return t('sourceInstagram')
+  if (platform === 'youtube') return t('sourceYoutube')
+  return t('sourceUnknown')
+}
+
 // ── Creator card ──────────────────────────────────────────────────────────────
 function CreatorCard({ video, allVideos }) {
   const { t } = useLanguage()
@@ -118,6 +124,9 @@ export default function VideoDetails({ video, allVideos = [] }) {
 
       {/* Status + duration inline */}
       <div className="video-meta-row">
+        <span className={`source-badge source-badge-${video.platform || 'unknown'}`}>
+          {sourceLabel(video.platform, t)}
+        </span>
         <span className="status">{video.status}</span>
         {duration && (
           <span className="video-duration-badge">⏱ {duration}</span>

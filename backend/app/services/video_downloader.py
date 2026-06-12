@@ -3,6 +3,8 @@ from pathlib import Path
 
 import yt_dlp
 
+from app.core.config import settings
+
 
 def _clear_partial_downloads(output_dir: Path, video_id: int) -> None:
     for path in output_dir.glob(f"{video_id}.*"):
@@ -10,7 +12,24 @@ def _clear_partial_downloads(output_dir: Path, video_id: int) -> None:
             path.unlink(missing_ok=True)
 
 
-def download_video(url: str, output_dir: Path, video_id: int) -> dict:
+def _duration_limit_for(platform: str) -> int | None:
+    if platform == "youtube":
+        return settings.max_youtube_duration_seconds
+    return None
+
+
+def _check_duration(info: dict, platform: str) -> None:
+    limit = _duration_limit_for(platform)
+    duration = info.get("duration")
+    if limit and duration and duration > limit:
+        minutes = int(limit // 60)
+        raise RuntimeError(
+            f"YouTube videos longer than {minutes} minutes are not supported yet. "
+            "Choose a shorter video or raise MYINSTA_MAX_YOUTUBE_DURATION_SECONDS."
+        )
+
+
+def download_video(url: str, output_dir: Path, video_id: int, platform: str = "instagram") -> dict:
     """Download a video with yt-dlp and return metadata plus local path."""
     output_dir.mkdir(parents=True, exist_ok=True)
     output_template = str((output_dir / f"{video_id}.%(ext)s").resolve())
@@ -21,6 +40,7 @@ def download_video(url: str, output_dir: Path, video_id: int) -> dict:
         "quiet": True,
         "noprogress": True,
         "no_warnings": True,
+        "noplaylist": True,
         "updatetime": False,
         "windowsfilenames": True,
         "retries": 3,
@@ -30,6 +50,10 @@ def download_video(url: str, output_dir: Path, video_id: int) -> dict:
     cookies_file = os.getenv("INSTAGRAM_COOKIES_FILE")
     if cookies_file and Path(cookies_file).exists():
         ydl_opts["cookiefile"] = cookies_file
+    elif platform == "youtube":
+        cookies_file = os.getenv("YOUTUBE_COOKIES_FILE")
+        if cookies_file and Path(cookies_file).exists():
+            ydl_opts["cookiefile"] = cookies_file
 
     last_error = None
     for attempt in range(2):
@@ -37,9 +61,14 @@ def download_video(url: str, output_dir: Path, video_id: int) -> dict:
             if attempt:
                 _clear_partial_downloads(output_dir, video_id)
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                info = ydl.extract_info(url, download=False)
+                if info is None:
+                    raise RuntimeError("no metadata returned")
+                _check_duration(info, platform)
                 info = ydl.extract_info(url, download=True)
                 if info is None:
                     raise RuntimeError("no metadata returned")
+                _check_duration(info, platform)
 
                 local_path = Path(ydl.prepare_filename(info))
             break
@@ -65,6 +94,7 @@ def download_video(url: str, output_dir: Path, video_id: int) -> dict:
         uploader_url = f"https://www.instagram.com/{uploader_id}/"
 
     return {
+        "platform": platform,
         "title": info.get("title"),
         "description": info.get("description"),
         "uploader": info.get("uploader") or info.get("channel"),

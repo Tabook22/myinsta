@@ -35,7 +35,7 @@ def test_health(client):
     assert response.json() == {"status": "ok"}
 
 
-def test_create_video_rejects_non_instagram_url(client):
+def test_create_video_rejects_unsupported_url(client):
     response = client.post(
         "/api/videos",
         json={"url": "https://example.com/video"},
@@ -89,13 +89,40 @@ def test_create_video_starts_processing(client, monkeypatch):
     assert response.status_code == 201
     body = response.json()
     assert body["status"] == "processing"
+    assert body["platform"] == "instagram"
 
     detail = client.get(f"/api/videos/{body['id']}")
     assert detail.status_code == 200
     detail_body = detail.json()
     assert detail_body["status"] == "ready"
+    assert detail_body["platform"] == "instagram"
     assert detail_body["transcript"]["full_text"] == "Hello world"
     assert detail_body["video_url"] == f"/api/videos/{body['id']}/stream"
+
+
+def test_create_video_accepts_youtube_url(client, monkeypatch):
+    def fake_process(video_id: int) -> None:
+        with get_connection() as conn:
+            conn.execute(
+                "UPDATE videos SET status = ?, title = ? WHERE id = ?",
+                ("ready", "YouTube test", video_id),
+            )
+
+    monkeypatch.setattr(videos_routes, "process_video", fake_process)
+
+    response = client.post(
+        "/api/videos",
+        json={"url": "https://www.youtube.com/watch?v=abc123"},
+    )
+    assert response.status_code == 201
+    body = response.json()
+    assert body["platform"] == "youtube"
+
+    detail = client.get(f"/api/videos/{body['id']}")
+    assert detail.status_code == 200
+    detail_body = detail.json()
+    assert detail_body["status"] == "ready"
+    assert detail_body["platform"] == "youtube"
 
 
 def test_list_videos_returns_recent_items(client, monkeypatch):
@@ -260,6 +287,64 @@ def test_translate_description_to_arabic(client, monkeypatch):
     assert detail.json()["description_translation_ar"] == "AR description"
 
 
+def test_clean_transcript_to_english_and_arabic(client, monkeypatch):
+    calls = []
+
+    def fake_translate(text: str, source_language: str | None = None) -> str:
+        calls.append((text, source_language))
+        return "AR cleaned transcript"
+
+    monkeypatch.setattr(videos_routes, "translate_to_arabic", fake_translate)
+
+    with get_connection() as conn:
+        cursor = conn.execute(
+            """
+            INSERT INTO videos (source_url, status, title)
+            VALUES (?, ?, ?)
+            """,
+            ("https://www.instagram.com/reel/CLEAN/", "ready", "Cleanup test"),
+        )
+        video_id = cursor.lastrowid
+        conn.execute(
+            """
+            INSERT INTO transcripts (video_id, language, full_text, segments_json)
+            VALUES (?, ?, ?, ?)
+            """,
+            (
+                video_id,
+                "en",
+                "hello hello this is useful useful then we explain cleanup",
+                "[]",
+            ),
+        )
+
+    english_response = client.post(f"/api/videos/{video_id}/cleanup?target_language=en")
+    assert english_response.status_code == 200
+    english_body = english_response.json()
+    assert english_body["target_language"] == "en"
+    assert "hello hello" not in english_body["cleaned_text"].lower()
+    assert english_body["cleaned_text"].endswith(".")
+
+    arabic_response = client.post(f"/api/videos/{video_id}/cleanup?target_language=ar")
+    assert arabic_response.status_code == 200
+    assert arabic_response.json() == {
+        "video_id": video_id,
+        "target_language": "ar",
+        "cleaned_text": "AR cleaned transcript",
+    }
+    assert calls == [(english_body["cleaned_text"], "en")]
+
+    cached_response = client.post(f"/api/videos/{video_id}/cleanup?target_language=ar")
+    assert cached_response.status_code == 200
+    assert len(calls) == 1
+
+    detail = client.get(f"/api/videos/{video_id}")
+    assert detail.status_code == 200
+    transcript = detail.json()["transcript"]
+    assert transcript["cleaned_text"] == english_body["cleaned_text"]
+    assert transcript["cleaned_translation_ar"] == "AR cleaned transcript"
+
+
 def test_chat_uses_transcript(client):
     with get_connection() as conn:
         cursor = conn.execute(
@@ -297,3 +382,58 @@ def test_chat_uses_transcript(client):
 
     history = client.get(f"/api/videos/{video_id}/chat")
     assert len(history.json()["messages"]) == 2
+
+
+def test_chat_answer_language_modes(client, monkeypatch):
+    calls = []
+
+    def fake_translate(text: str, source_language: str | None = None) -> str:
+        calls.append((text, source_language))
+        return "إجابة عربية"
+
+    monkeypatch.setattr(videos_routes, "translate_to_arabic", fake_translate)
+
+    with get_connection() as conn:
+        cursor = conn.execute(
+            """
+            INSERT INTO videos (source_url, status, title)
+            VALUES (?, ?, ?)
+            """,
+            ("https://www.instagram.com/reel/CHATLANG/", "ready", "Chat language test"),
+        )
+        video_id = cursor.lastrowid
+        conn.execute(
+            """
+            INSERT INTO transcripts (video_id, language, full_text, segments_json)
+            VALUES (?, ?, ?, ?)
+            """,
+            (
+                video_id,
+                "en",
+                "This reel explains how to batch cook healthy meals for the week.",
+                "[]",
+            ),
+        )
+
+    arabic_response = client.post(
+        f"/api/videos/{video_id}/chat",
+        json={
+            "message": "What is this video about?",
+            "answer_language": "arabic",
+        },
+    )
+    assert arabic_response.status_code == 200
+    assert arabic_response.json()["answer"] == "إجابة عربية"
+
+    bilingual_response = client.post(
+        f"/api/videos/{video_id}/chat",
+        json={
+            "message": "What is this video about?",
+            "answer_language": "bilingual",
+        },
+    )
+    assert bilingual_response.status_code == 200
+    bilingual_answer = bilingual_response.json()["answer"]
+    assert bilingual_answer.startswith("English:\n")
+    assert "\n\nArabic:\nإجابة عربية" in bilingual_answer
+    assert len(calls) == 2

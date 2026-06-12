@@ -15,7 +15,7 @@ Responsibilities:
 
 ### `UrlSubmitForm`
 
-- Text input for Instagram URL.
+- Text input for an Instagram or YouTube URL.
 - Submit button.
 - Calls `onSubmit(url)`.
 - Disables button while submitting.
@@ -30,13 +30,15 @@ Responsibilities:
 
 - Shows full transcript text when available.
 - Shows waiting/empty state while processing.
+- Lets the user switch between original, cleaned, and Arabic cleaned text.
 - Later: add timestamped segment list.
 
 ### `ChatPanel`
 
-- Shows placeholder chat box.
-- Sends message to `POST /api/videos/{video_id}/chat`.
-- Later: render chat history and cited transcript snippets.
+- Shows chat history.
+- Lets the user choose transcript or web answer mode.
+- Lets the user choose English, Arabic, or bilingual answers.
+- Sends message, mode, and answer language to `POST /api/videos/{video_id}/chat`.
 
 ## API client
 
@@ -45,7 +47,8 @@ Responsibilities:
 - `createVideo(url)`
 - `getVideo(videoId)`
 - `listVideos()`
-- `chatWithVideo(videoId, message)`
+- `cleanTranscript(videoId, targetLanguage)`
+- `chatWithVideo(videoId, message, mode, answerLanguage)`
 
 ## State management
 

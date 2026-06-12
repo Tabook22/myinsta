@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { translateTranscriptToArabic } from '../api/client.js'
+import { cleanTranscript } from '../api/client.js'
 import { useLanguage } from '../context/LanguageContext.jsx'
 import QuoteCardModal from './QuoteCardModal.jsx'
 
@@ -9,19 +9,28 @@ export default function TranscriptViewer({ status, transcript, video }) {
   const [selectedQuote, setSelectedQuote] = useState('')
   const [showQuoteCard, setShowQuoteCard] = useState(false)
   const [viewMode, setViewMode] = useState('original')
-  const [arabicText, setArabicText] = useState(transcript?.translation_ar || '')
-  const [isTranslating, setIsTranslating] = useState(false)
-  const [translationError, setTranslationError] = useState('')
+  const [cleanedText, setCleanedText] = useState(transcript?.cleaned_text || '')
+  const [arabicText, setArabicText] = useState(transcript?.cleaned_translation_ar || transcript?.translation_ar || '')
+  const [cleanupTarget, setCleanupTarget] = useState('')
+  const [cleanupError, setCleanupError] = useState('')
 
   useEffect(() => {
     setViewMode('original')
-    setArabicText(transcript?.translation_ar || '')
-    setTranslationError('')
+    setCleanedText(transcript?.cleaned_text || '')
+    setArabicText(transcript?.cleaned_translation_ar || transcript?.translation_ar || '')
+    setCleanupTarget('')
+    setCleanupError('')
     setSelectedQuote('')
-  }, [transcript?.full_text, transcript?.translation_ar])
+  }, [transcript?.full_text, transcript?.translation_ar, transcript?.cleaned_text, transcript?.cleaned_translation_ar])
 
-  const displayText = viewMode === 'arabic' ? arabicText : transcript?.full_text
-  const canTranslate = Boolean(transcript?.full_text?.trim())
+  const displayText = viewMode === 'arabic'
+    ? arabicText
+    : viewMode === 'cleaned'
+      ? cleanedText
+      : transcript?.full_text
+  const canClean = Boolean(transcript?.full_text?.trim())
+  const isCleaningEnglish = cleanupTarget === 'en'
+  const isCleaningArabic = cleanupTarget === 'ar'
 
   async function handleCopy() {
     if (!displayText) return
@@ -42,23 +51,43 @@ export default function TranscriptViewer({ status, transcript, video }) {
     }
   }
 
+  async function handleShowCleaned() {
+    if (!canClean) return
+    setCleanupError('')
+    if (cleanedText) {
+      setViewMode('cleaned')
+      return
+    }
+
+    setCleanupTarget('en')
+    try {
+      const result = await cleanTranscript(video.id, 'en')
+      setCleanedText(result.cleaned_text)
+      setViewMode('cleaned')
+    } catch (err) {
+      setCleanupError(err.message)
+    } finally {
+      setCleanupTarget('')
+    }
+  }
+
   async function handleShowArabic() {
-    if (!canTranslate) return
-    setTranslationError('')
-    if (arabicText) {
+    if (!canClean) return
+    setCleanupError('')
+    if (arabicText && transcript?.cleaned_translation_ar) {
       setViewMode('arabic')
       return
     }
 
-    setIsTranslating(true)
+    setCleanupTarget('ar')
     try {
-      const result = await translateTranscriptToArabic(video.id)
-      setArabicText(result.translated_text)
+      const result = await cleanTranscript(video.id, 'ar')
+      setArabicText(result.cleaned_text)
       setViewMode('arabic')
     } catch (err) {
-      setTranslationError(err.message)
+      setCleanupError(err.message)
     } finally {
-      setIsTranslating(false)
+      setCleanupTarget('')
     }
   }
 
@@ -93,22 +122,31 @@ export default function TranscriptViewer({ status, transcript, video }) {
               ✨ {t('quoteCreateCard')}
             </button>
           )}
-          {canTranslate && (
+          {canClean && (
             <div className="transcript-mode-toggle" aria-label={t('transcriptViewMode')}>
               <button
                 type="button"
                 className={viewMode === 'original' ? 'transcript-mode-active' : ''}
+                disabled={Boolean(cleanupTarget)}
                 onClick={() => setViewMode('original')}
               >
                 {t('originalTranscript')}
               </button>
               <button
                 type="button"
+                className={viewMode === 'cleaned' ? 'transcript-mode-active' : ''}
+                onClick={handleShowCleaned}
+                disabled={Boolean(cleanupTarget)}
+              >
+                {isCleaningEnglish ? t('cleaningTranscript') : t('cleanTranscript')}
+              </button>
+              <button
+                type="button"
                 className={viewMode === 'arabic' ? 'transcript-mode-active' : ''}
                 onClick={handleShowArabic}
-                disabled={isTranslating}
+                disabled={Boolean(cleanupTarget)}
               >
-                {isTranslating ? t('translatingTranscript') : t('arabicTranscript')}
+                {isCleaningArabic ? t('cleaningTranscript') : t('arabicTranscript')}
               </button>
             </div>
           )}
@@ -142,8 +180,8 @@ export default function TranscriptViewer({ status, transcript, video }) {
       {selectedQuote && (
         <p className="quote-selection-hint">{t('quoteSelectionHint')}</p>
       )}
-      {translationError && (
-        <p className="error">{translationError}</p>
+      {cleanupError && (
+        <p className="error">{cleanupError}</p>
       )}
 
       {displayText ? (

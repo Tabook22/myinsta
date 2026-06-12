@@ -1,10 +1,12 @@
 # Build Order and Current State
 
 MyInsta is now past the skeleton phase. The local MVP supports submitting an
-Instagram video URL, downloading media with yt-dlp, extracting audio with
+Instagram or YouTube video URL, downloading media with yt-dlp, extracting audio with
 FFmpeg, transcribing with Whisper, saving files into the dated local library,
 editing metadata/transcript text, deleting saved videos, streaming local video,
-and asking simple transcript-grounded chat questions.
+cleaning Whisper transcripts into readable English or Arabic, and asking simple
+transcript-grounded chat questions with English, Arabic, or bilingual answer
+modes.
 
 ## Implemented
 
@@ -18,7 +20,11 @@ and asking simple transcript-grounded chat questions.
 4. React UI for URL submission, processing status, saved library, local
    playback, transcript display, editing, deletion, and chat.
 5. Arabic transcript translation on demand, with the translated text cached in SQLite.
-6. Backend tests covering health, create/list/get, edit/delete/stream, translation, and chat.
+6. Transcript cleanup for readable English and Arabic output.
+7. Chat answer-language modes for English, Arabic, and bilingual replies.
+8. Backend tests covering health, create/list/get, edit/delete/stream, translation, cleanup, and chat.
+9. Controlled YouTube support using the same local media/audio/transcript
+   pipeline, with a default 30-minute duration guard.
 
 ## Local Verification
 
@@ -65,4 +71,5 @@ sudo systemctl restart myinsta.service
    Whisper failures.
 2. Add more tests around partial pipeline failures and library file cleanup.
 3. Keep README/API docs aligned as behavior changes.
-4. Only after MVP polish, design transcript chunking and future vector retrieval.
+4. Consider subtitle/caption import for YouTube before falling back to Whisper.
+5. Only after MVP polish, design transcript chunking and future vector retrieval.

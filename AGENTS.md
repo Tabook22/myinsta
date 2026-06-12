@@ -4,7 +4,32 @@ This file is for Cursor, Hermes, and other coding agents working on MyInsta.
 
 ## Project summary
 
-MyInsta is a local-first React + Vite frontend and Python FastAPI backend. Users paste an Instagram Reel/Post video link. The backend downloads/processes the video, extracts audio, transcribes speech with Whisper, saves metadata/transcripts/media references in SQLite, stores processed files in a local library, and supports simple transcript-grounded chat. Full RAG over transcript chunks is a later phase.
+MyInsta is a local-first React + Vite frontend and Python FastAPI backend. Users paste an Instagram Reel/Post video link or a YouTube video link. The backend downloads/processes the video, extracts audio, transcribes speech with Whisper, saves metadata/transcripts/media references in SQLite, stores processed files in a local library, and supports simple transcript-grounded chat. Full RAG over transcript chunks is a later phase.
+
+## Agent identity / soul
+
+MyInsta is a private memory librarian for short-form video. Its job is to turn
+fast, messy Instagram moments into a calm personal knowledge library: saved
+media, readable transcripts, Arabic/English understanding, notes, and grounded
+questions the user can return to later.
+
+The agent's soul is practical, quiet, and preservation-minded. It should feel
+like a careful archivist sitting beside the user: it catches useful ideas before
+they disappear in the feed, cleans them into readable form, keeps the original
+source intact, and helps the user ask better questions of what they saved.
+
+When making product or engineering decisions, preserve this identity:
+
+- Local-first and user-owned: protect the user's saved media, transcripts, notes,
+  and SQLite data.
+- Readability over spectacle: make transcripts, Arabic translations, chat
+  answers, and UI states clear enough to study and reuse.
+- Grounded assistance: answer from the saved video, transcript, and explicit web
+  mode; do not pretend simple chat is full RAG or general intelligence.
+- Bilingual by design: Arabic support is part of the core workflow, not a
+  decorative language toggle.
+- Calm MVP discipline: improve the capture -> transcribe -> clean -> translate
+  -> chat -> note workflow before adding heavy infrastructure.
 
 ## Current phase
 
@@ -12,7 +37,7 @@ The project is now in a working local MVP phase, beyond the initial skeleton.
 
 Implemented vertical slice:
 
-1. Submit an Instagram video URL from React.
+1. Submit an Instagram or YouTube video URL from React.
 2. Create a video record in SQLite.
 3. Download/process the video locally with yt-dlp.
 4. Extract audio locally with FFmpeg.
@@ -23,6 +48,8 @@ Implemented vertical slice:
 9. Edit video title, description, and transcript text.
 10. Delete a saved video and its local library folder.
 11. Ask basic transcript-grounded questions through a non-vector, local chat service.
+12. Save YouTube videos through the same local pipeline, with a default duration
+    guard so long-form videos do not overwhelm the MVP.
 
 Current focus:
 
@@ -73,7 +100,10 @@ Hermes may edit code or docs directly when the user explicitly asks, or when upd
 - Keep React state in component state for now; do not add Redux/Zustand yet.
 - Do not add authentication, payments, cloud storage, Docker, Celery, Redis, or vector DBs until the core local workflow is stable.
 - Do not commit downloaded videos, extracted audio, SQLite databases, generated library media, `.env` files, or secrets.
-- Treat Instagram downloads as personal/local prototype behavior and avoid building public-platform assumptions into the app.
+- Treat Instagram and YouTube downloads as personal/local prototype behavior and avoid building public-platform assumptions into the app.
+- Keep YouTube support controlled: short/medium public videos are in scope now;
+  very long videos, playlists, channels, and bulk ingestion should wait until
+  chunking/retrieval and stronger background processing exist.
 
 ## Expected commands
 
@@ -129,7 +159,7 @@ npm run build
 
 Important backend services:
 
-- `video_downloader.py`: downloads video and metadata with yt-dlp.
+- `video_downloader.py`: downloads Instagram/YouTube video and metadata with yt-dlp.
 - `audio_extractor.py`: extracts 16 kHz mono WAV with FFmpeg.
 - `transcriber.py`: runs Whisper transcription.
 - `library_storage.py`: moves processed media/transcript/metadata into the dated local library.
@@ -159,7 +189,7 @@ Important frontend components:
 Base URL during development: `http://localhost:8000`
 
 - `GET /health` checks backend status.
-- `POST /api/videos` submits a URL and starts processing.
+- `POST /api/videos` submits an Instagram or YouTube URL and starts processing.
 - `GET /api/videos` lists recent videos.
 - `GET /api/videos/{video_id}` fetches one video and transcript.
 - `PATCH /api/videos/{video_id}` updates title, description, and/or transcript text.
@@ -172,7 +202,7 @@ Base URL during development: `http://localhost:8000`
 
 Core tables:
 
-- `videos`: one row per submitted Instagram video URL, including processing status, metadata, local file paths, and library folder/stamp fields.
+- `videos`: one row per submitted Instagram or YouTube video URL, including processing status, platform, metadata, local file paths, and library folder/stamp fields.
 - `transcripts`: one transcript per video, with full text, language, and optional Whisper segment JSON.
 - `chat_messages`: persisted user/assistant chat history for each video.
 

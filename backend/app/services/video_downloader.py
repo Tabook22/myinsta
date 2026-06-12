@@ -42,6 +42,17 @@ def _apply_cookie_options(ydl_opts: dict, platform: str) -> None:
         ydl_opts["cookiefile"] = cookies_file
 
 
+def _format_selector_for(platform: str) -> str:
+    if platform == "youtube":
+        return (
+            "bv*[ext=mp4]+ba[ext=m4a]/"
+            "bv*+ba/"
+            "b[ext=mp4]/"
+            "b"
+        )
+    return "best[ext=mp4]/best"
+
+
 def _friendly_download_error(error: Exception, platform: str) -> str:
     message = str(error)
     if platform == "youtube" and (
@@ -55,6 +66,12 @@ def _friendly_download_error(error: Exception, platform: str) -> str:
             "or on your local machine set YOUTUBE_COOKIES_FROM_BROWSER=chrome "
             "or edge, then restart the backend."
         )
+    if platform == "youtube" and "Requested format is not available" in message:
+        return (
+            "YouTube did not provide the requested media format for this video. "
+            "The downloader now uses a broader YouTube format selector; pull the "
+            "latest code and restart the backend, then submit the video again."
+        )
     return f"Video download failed: {message}"
 
 
@@ -65,7 +82,8 @@ def download_video(url: str, output_dir: Path, video_id: int, platform: str = "i
 
     ydl_opts = {
         "outtmpl": output_template,
-        "format": "best[ext=mp4]/best",
+        "format": _format_selector_for(platform),
+        "merge_output_format": "mp4",
         "quiet": True,
         "noprogress": True,
         "no_warnings": True,

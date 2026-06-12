@@ -1,5 +1,9 @@
 from app.services import video_downloader
-from app.services.video_downloader import _apply_cookie_options, _friendly_download_error
+from app.services.video_downloader import (
+    _apply_cookie_options,
+    _format_selector_for,
+    _friendly_download_error,
+)
 
 
 def test_youtube_cookie_error_is_actionable():
@@ -11,6 +15,24 @@ def test_youtube_cookie_error_is_actionable():
     assert "YouTube blocked this download" in message
     assert "YOUTUBE_COOKIES_FILE" in message
     assert "YOUTUBE_COOKIES_FROM_BROWSER" in message
+
+
+def test_youtube_format_error_is_actionable():
+    message = _friendly_download_error(
+        RuntimeError("Requested format is not available. Use --list-formats."),
+        "youtube",
+    )
+
+    assert "broader YouTube format selector" in message
+    assert "restart the backend" in message
+
+
+def test_youtube_uses_broader_format_selector():
+    selector = _format_selector_for("youtube")
+
+    assert "bv*" in selector
+    assert "ba" in selector
+    assert _format_selector_for("instagram") == "best[ext=mp4]/best"
 
 
 def test_youtube_cookie_file_setting_is_used(monkeypatch, tmp_path):

@@ -42,6 +42,22 @@ def _apply_cookie_options(ydl_opts: dict, platform: str) -> None:
         ydl_opts["cookiefile"] = cookies_file
 
 
+def _cookie_status_for(platform: str) -> str:
+    if platform != "youtube":
+        return ""
+
+    cookies_file = settings.youtube_cookies_file or settings.instagram_cookies_file
+    if not cookies_file:
+        return "No YOUTUBE_COOKIES_FILE is configured."
+
+    path = Path(cookies_file)
+    if not path.exists():
+        return f"Configured cookie file does not exist: {cookies_file}"
+
+    size = path.stat().st_size
+    return f"Cookie file found at {cookies_file} ({size} bytes), but YouTube rejected it."
+
+
 def _format_selectors_for(platform: str) -> list[str | None]:
     if platform == "youtube":
         return [
@@ -62,9 +78,9 @@ def _friendly_download_error(error: Exception, platform: str) -> str:
     ):
         return (
             "YouTube blocked this download because it needs browser cookies. "
-            "Set YOUTUBE_COOKIES_FILE to an exported YouTube cookies.txt file, "
-            "or on your local machine set YOUTUBE_COOKIES_FROM_BROWSER=chrome "
-            "or edge, then restart the backend."
+            f"{_cookie_status_for(platform)} "
+            "Export a fresh cookies.txt from a browser that is signed in to YouTube, "
+            "upload it to YOUTUBE_COOKIES_FILE, then restart the backend."
         )
     if platform == "youtube" and "Requested format is not available" in message:
         return (

@@ -14,7 +14,7 @@ def test_youtube_cookie_error_is_actionable():
 
     assert "YouTube blocked this download" in message
     assert "YOUTUBE_COOKIES_FILE" in message
-    assert "YOUTUBE_COOKIES_FROM_BROWSER" in message
+    assert "fresh cookies.txt" in message
 
 
 def test_youtube_format_error_is_actionable():

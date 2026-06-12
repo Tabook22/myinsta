@@ -46,7 +46,7 @@ def _apply_youtube_runtime_options(ydl_opts: dict, platform: str) -> None:
     if platform != "youtube":
         return
 
-    ydl_opts["js_runtimes"] = ["node"]
+    ydl_opts["js_runtimes"] = {"node": {}}
 
 
 def _cookie_status_for(platform: str) -> str:

@@ -52,7 +52,7 @@ def test_youtube_enables_node_runtime():
     ydl_opts = {}
     _apply_youtube_runtime_options(ydl_opts, "youtube")
 
-    assert ydl_opts["js_runtimes"] == ["node"]
+    assert ydl_opts["js_runtimes"] == {"node": {}}
 
 
 def test_instagram_does_not_set_js_runtime():

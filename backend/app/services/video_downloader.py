@@ -29,6 +29,36 @@ def _check_duration(info: dict, platform: str) -> None:
         )
 
 
+def _apply_cookie_options(ydl_opts: dict, platform: str) -> None:
+    cookies_file = os.getenv("INSTAGRAM_COOKIES_FILE")
+    if platform == "youtube":
+        cookies_file = os.getenv("YOUTUBE_COOKIES_FILE") or cookies_file
+
+        browser = os.getenv("YOUTUBE_COOKIES_FROM_BROWSER", "").strip().lower()
+        if browser:
+            ydl_opts["cookiesfrombrowser"] = (browser,)
+            return
+
+    if cookies_file and Path(cookies_file).exists():
+        ydl_opts["cookiefile"] = cookies_file
+
+
+def _friendly_download_error(error: Exception, platform: str) -> str:
+    message = str(error)
+    if platform == "youtube" and (
+        "Sign in to confirm" in message
+        or "not a bot" in message
+        or "cookies" in message.lower()
+    ):
+        return (
+            "YouTube blocked this download because it needs browser cookies. "
+            "Set YOUTUBE_COOKIES_FILE to an exported YouTube cookies.txt file, "
+            "or on your local machine set YOUTUBE_COOKIES_FROM_BROWSER=chrome "
+            "or edge, then restart the backend."
+        )
+    return f"Video download failed: {message}"
+
+
 def download_video(url: str, output_dir: Path, video_id: int, platform: str = "instagram") -> dict:
     """Download a video with yt-dlp and return metadata plus local path."""
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -47,13 +77,7 @@ def download_video(url: str, output_dir: Path, video_id: int, platform: str = "i
         "fragment_retries": 3,
     }
 
-    cookies_file = os.getenv("INSTAGRAM_COOKIES_FILE")
-    if cookies_file and Path(cookies_file).exists():
-        ydl_opts["cookiefile"] = cookies_file
-    elif platform == "youtube":
-        cookies_file = os.getenv("YOUTUBE_COOKIES_FILE")
-        if cookies_file and Path(cookies_file).exists():
-            ydl_opts["cookiefile"] = cookies_file
+    _apply_cookie_options(ydl_opts, platform)
 
     last_error = None
     for attempt in range(2):
@@ -75,7 +99,7 @@ def download_video(url: str, output_dir: Path, video_id: int, platform: str = "i
         except Exception as exc:
             last_error = exc
     else:
-        raise RuntimeError(f"Video download failed: {last_error}") from last_error
+        raise RuntimeError(_friendly_download_error(last_error, platform)) from last_error
 
     if not local_path.exists():
         matches = sorted(output_dir.glob(f"{video_id}.*"))

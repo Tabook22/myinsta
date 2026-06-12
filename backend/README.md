@@ -25,6 +25,23 @@ uv pip install --no-build-isolation -r requirements.txt
 
 Open http://localhost:8000/docs after starting the server.
 
+## YouTube cookies
+
+Some YouTube videos ask yt-dlp to prove the request is from a signed-in browser.
+For local Windows development, set this in `backend/.env` and restart the
+backend:
+
+```text
+YOUTUBE_COOKIES_FROM_BROWSER=chrome
+```
+
+Use `edge` or `firefox` instead if that is where you are signed in. On a VPS,
+export a YouTube `cookies.txt` file from your browser and set:
+
+```text
+YOUTUBE_COOKIES_FILE=/home/nasser/.config/myinsta/youtube_cookies.txt
+```
+
 ## Transcript and chat translation
 
 `POST /api/videos/{video_id}/cleanup?target_language=en` cleans a ready

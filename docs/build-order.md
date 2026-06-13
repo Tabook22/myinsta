@@ -24,7 +24,7 @@ modes.
 7. Chat answer-language modes for English, Arabic, and bilingual replies.
 8. Backend tests covering health, create/list/get, edit/delete/stream, translation, cleanup, and chat.
 9. Controlled YouTube support using the same local media/audio/transcript
-   pipeline, with a default 30-minute duration guard.
+   pipeline, with an optional configurable duration guard.
 
 ## Local Verification
 

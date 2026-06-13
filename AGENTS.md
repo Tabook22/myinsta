@@ -48,8 +48,8 @@ Implemented vertical slice:
 9. Edit video title, description, and transcript text.
 10. Delete a saved video and its local library folder.
 11. Ask basic transcript-grounded questions through a non-vector, local chat service.
-12. Save YouTube videos through the same local pipeline, with a default duration
-    guard so long-form videos do not overwhelm the MVP.
+12. Save YouTube videos through the same local pipeline, with an optional
+    duration guard controlled by `MYINSTA_MAX_YOUTUBE_DURATION_SECONDS`.
 
 Current focus:
 
@@ -101,9 +101,9 @@ Hermes may edit code or docs directly when the user explicitly asks, or when upd
 - Do not add authentication, payments, cloud storage, Docker, Celery, Redis, or vector DBs until the core local workflow is stable.
 - Do not commit downloaded videos, extracted audio, SQLite databases, generated library media, `.env` files, or secrets.
 - Treat Instagram and YouTube downloads as personal/local prototype behavior and avoid building public-platform assumptions into the app.
-- Keep YouTube support controlled: short/medium public videos are in scope now;
-  very long videos, playlists, channels, and bulk ingestion should wait until
-  chunking/retrieval and stronger background processing exist.
+- Keep YouTube support controlled: individual videos are in scope now; playlists,
+  channels, and bulk ingestion should wait until chunking/retrieval and stronger
+  background processing exist.
 
 ## Expected commands
 

@@ -28,10 +28,9 @@ Implemented:
 8. View, stream, edit, delete, and chat with saved videos.
 9. Ask chat questions with English, Arabic, or bilingual answer modes.
 
-YouTube support is intentionally guarded for the MVP: videos longer than 30
-minutes are rejected by default to keep downloads, Whisper transcription, and
-translation practical. Set `MYINSTA_MAX_YOUTUBE_DURATION_SECONDS` to adjust the
-limit.
+YouTube duration is configurable with `MYINSTA_MAX_YOUTUBE_DURATION_SECONDS`.
+The default is `0`, which disables the hard duration guard. Long videos can take
+more disk space and transcription time.
 
 ## Run Locally
 

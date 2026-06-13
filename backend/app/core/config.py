@@ -13,7 +13,7 @@ class Settings(BaseSettings):
     cors_origins: str = "http://localhost:5173,http://127.0.0.1:5173"
     whisper_model: str = "base"
     brave_search_api_key: str = ""   # Get free key at brave.com/search/api/
-    max_youtube_duration_seconds: int = 1800
+    max_youtube_duration_seconds: int = 0
     instagram_cookies_file: str = Field(default="", alias="INSTAGRAM_COOKIES_FILE")
     youtube_cookies_file: str = Field(default="", alias="YOUTUBE_COOKIES_FILE")
     youtube_cookies_from_browser: str = Field(default="", alias="YOUTUBE_COOKIES_FROM_BROWSER")

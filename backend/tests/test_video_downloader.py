@@ -2,6 +2,7 @@ from app.services import video_downloader
 from app.services.video_downloader import (
     _apply_cookie_options,
     _apply_youtube_runtime_options,
+    _check_duration,
     _extractor_args_for,
     _format_selectors_for,
     _friendly_download_error,
@@ -60,6 +61,23 @@ def test_instagram_does_not_set_js_runtime():
     _apply_youtube_runtime_options(ydl_opts, "instagram")
 
     assert "js_runtimes" not in ydl_opts
+
+
+def test_zero_youtube_duration_limit_allows_long_videos(monkeypatch):
+    monkeypatch.setattr(video_downloader.settings, "max_youtube_duration_seconds", 0)
+
+    _check_duration({"duration": 7200}, "youtube")
+
+
+def test_configured_youtube_duration_limit_blocks_long_videos(monkeypatch):
+    monkeypatch.setattr(video_downloader.settings, "max_youtube_duration_seconds", 1800)
+
+    try:
+        _check_duration({"duration": 7200}, "youtube")
+    except RuntimeError as exc:
+        assert "longer than 30 minutes" in str(exc)
+    else:
+        raise AssertionError("Expected long video to be rejected")
 
 
 def test_youtube_cookie_file_setting_is_used(monkeypatch, tmp_path):

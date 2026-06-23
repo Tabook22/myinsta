@@ -3,16 +3,25 @@ import { createRoot } from 'react-dom/client'
 import App from './App.jsx'
 import './styles.css'
 
-// Register service worker for PWA support
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker
-      .register('/myinsta/sw.js', { scope: '/myinsta/' })
-      .then((registration) => {
-        registration.update()
-        if (registration.waiting) registration.waiting.postMessage({ type: 'SKIP_WAITING' })
+    navigator.serviceWorker.getRegistrations()
+      .then((registrations) => {
+        registrations
+          .filter((registration) => registration.scope.includes('/myinsta/'))
+          .forEach((registration) => registration.unregister())
       })
-      .catch((err) => console.warn('SW registration failed:', err))
+      .catch((err) => console.warn('SW cleanup failed:', err))
+
+    if ('caches' in window) {
+      caches.keys()
+        .then((keys) => {
+          keys
+            .filter((key) => key.startsWith('myinsta-'))
+            .forEach((key) => caches.delete(key))
+        })
+        .catch((err) => console.warn('Cache cleanup failed:', err))
+    }
   })
 }
 

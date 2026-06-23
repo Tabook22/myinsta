@@ -11,7 +11,32 @@ function getDefaultApiBaseUrl() {
   return 'http://localhost:8000'
 }
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? getDefaultApiBaseUrl()
+function getApiBaseUrlFromEnvironment() {
+  const configuredUrl = import.meta.env.VITE_API_BASE_URL
+  if (!configuredUrl || typeof window === 'undefined') {
+    return configuredUrl
+  }
+
+  const isLocalDevHost = ['localhost', '127.0.0.1', '::1'].includes(window.location.hostname)
+  if (isLocalDevHost) {
+    return configuredUrl
+  }
+
+  try {
+    const parsedUrl = new URL(configuredUrl, window.location.origin)
+    const configuredHost = parsedUrl.hostname
+    if (['localhost', '127.0.0.1', '::1'].includes(configuredHost)) {
+      return null
+    }
+  } catch {
+    // Ignore malformed environment values and fall back to the runtime default.
+    return null
+  }
+
+  return configuredUrl
+}
+
+const API_BASE_URL = getApiBaseUrlFromEnvironment() ?? getDefaultApiBaseUrl()
 
 function parseErrorMessage(text) {
   if (!text) return 'Request failed'

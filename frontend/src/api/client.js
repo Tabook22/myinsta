@@ -18,6 +18,10 @@ function getApiBaseUrlFromEnvironment() {
   }
 
   const isLocalDevHost = ['localhost', '127.0.0.1', '::1'].includes(window.location.hostname)
+  if (!isLocalDevHost && window.location.pathname.startsWith('/myinsta')) {
+    return null
+  }
+
   if (isLocalDevHost) {
     return configuredUrl
   }

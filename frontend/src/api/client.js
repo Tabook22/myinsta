@@ -11,18 +11,28 @@ function getDefaultApiBaseUrl() {
   return 'http://localhost:8000'
 }
 
+function isLocalBrowserHost() {
+  if (typeof window === 'undefined') return true
+  return ['localhost', '127.0.0.1', '::1'].includes(window.location.hostname)
+}
+
+function isMyInstaDeployPath() {
+  return typeof window !== 'undefined'
+    && !isLocalBrowserHost()
+    && window.location.pathname.startsWith('/myinsta')
+}
+
 function getApiBaseUrlFromEnvironment() {
   const configuredUrl = import.meta.env.VITE_API_BASE_URL
   if (!configuredUrl || typeof window === 'undefined') {
     return configuredUrl
   }
 
-  const isLocalDevHost = ['localhost', '127.0.0.1', '::1'].includes(window.location.hostname)
-  if (!isLocalDevHost && window.location.pathname.startsWith('/myinsta')) {
+  if (isMyInstaDeployPath()) {
     return null
   }
 
-  if (isLocalDevHost) {
+  if (isLocalBrowserHost()) {
     return configuredUrl
   }
 
@@ -40,7 +50,21 @@ function getApiBaseUrlFromEnvironment() {
   return configuredUrl
 }
 
-const API_BASE_URL = getApiBaseUrlFromEnvironment() ?? getDefaultApiBaseUrl()
+function uniqueValues(values) {
+  return values.filter((value, index) => value && values.indexOf(value) === index)
+}
+
+function getApiBaseUrlCandidates() {
+  const deployedUrl = isMyInstaDeployPath() ? '/myinsta-api' : null
+  return uniqueValues([
+    deployedUrl,
+    getApiBaseUrlFromEnvironment(),
+    getDefaultApiBaseUrl(),
+  ])
+}
+
+const API_BASE_URLS = getApiBaseUrlCandidates()
+const API_BASE_URL = API_BASE_URLS[0]
 
 function parseErrorMessage(text) {
   if (!text) return 'Request failed'
@@ -59,29 +83,39 @@ function parseErrorMessage(text) {
 const REQUEST_TIMEOUT_MS = 10_000 // 10 seconds - fail fast if backend is down
 const TRANSLATION_TIMEOUT_MS = 60_000 // Longer text can take a little while
 
-async function request(path, options = {}) {
+async function fetchApiResponse(path, options = {}) {
   const { timeoutMs = REQUEST_TIMEOUT_MS, ...fetchOptions } = options
-  const controller = new AbortController()
-  const timer = setTimeout(() => controller.abort(), timeoutMs)
+  const failures = []
 
-  let response
-  try {
-    response = await fetch(`${API_BASE_URL}${path}`, {
-      headers: {
-        'Content-Type': 'application/json',
-        ...(fetchOptions.headers ?? {}),
-      },
-      signal: controller.signal,
-      ...fetchOptions,
-    })
-  } catch (err) {
-    if (err.name === 'AbortError') {
-      throw new Error('Server is not responding — please check back in a moment.')
+  for (const apiBaseUrl of API_BASE_URLS) {
+    const controller = new AbortController()
+    const timer = setTimeout(() => controller.abort(), timeoutMs)
+
+    try {
+      return await fetch(`${apiBaseUrl}${path}`, {
+        cache: 'no-store',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(fetchOptions.headers ?? {}),
+        },
+        signal: controller.signal,
+        ...fetchOptions,
+      })
+    } catch (err) {
+      failures.push(err)
+    } finally {
+      clearTimeout(timer)
     }
-    throw new Error('Cannot reach server — check your connection.')
-  } finally {
-    clearTimeout(timer)
   }
+
+  if (failures.some((err) => err.name === 'AbortError')) {
+    throw new Error('Server is not responding — please check back in a moment.')
+  }
+  throw new Error('Cannot reach server — check your connection.')
+}
+
+async function request(path, options = {}) {
+  const response = await fetchApiResponse(path, options)
 
   if (!response.ok) {
     const text = await response.text()
@@ -153,20 +187,7 @@ export function listVideos() {
 
 /** Paginated list — returns { items, total, hasMore } */
 export async function listVideosPaginated(limit = 20, offset = 0) {
-  const controller = new AbortController()
-  const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
-  let response
-  try {
-    response = await fetch(`${API_BASE_URL}/api/videos?limit=${limit}&offset=${offset}`, {
-      headers: { 'Content-Type': 'application/json' },
-      signal: controller.signal,
-    })
-  } catch (err) {
-    if (err.name === 'AbortError') throw new Error('Server is not responding — please check back in a moment.')
-    throw new Error('Cannot reach server — check your connection.')
-  } finally {
-    clearTimeout(timer)
-  }
+  const response = await fetchApiResponse(`/api/videos?limit=${limit}&offset=${offset}`)
   if (!response.ok) {
     const text = await response.text()
     throw new Error(parseErrorMessage(text) || `Request failed with status ${response.status}`)

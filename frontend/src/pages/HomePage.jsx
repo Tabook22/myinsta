@@ -105,6 +105,7 @@ export default function HomePage() {
   const [showEditor, setShowEditor]     = useState(false)
   const [error, setError]               = useState('')
   const [backendError, setBackendError] = useState('')
+  const [backendOnline, setBackendOnline] = useState(false)
   const [loadingLibrary, setLoadingLibrary] = useState(true)
   const [showOnboarding, setShowOnboarding] = useState(shouldShowOnboarding)
   const [showShortcuts, setShowShortcuts]   = useState(false)
@@ -122,8 +123,10 @@ export default function HomePage() {
       setHasMore(more)
       offsetRef.current = items.length
       setBackendError('')
+      setBackendOnline(true)
     } catch (err) {
       setBackendError(err.message)
+      setBackendOnline(false)
     } finally {
       setLoadingLibrary(false)
     }
@@ -282,6 +285,11 @@ export default function HomePage() {
         <div className="backend-error-banner">
           <span>{t('backendOffline')} {backendError}</span>
           <button type="button" onClick={loadRecentVideos}>{t('retry')}</button>
+        </div>
+      )}
+      {!backendError && backendOnline && (
+        <div className="backend-online-banner">
+          <span>Backend online: Server is responding.</span>
         </div>
       )}
 

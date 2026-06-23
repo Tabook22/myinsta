@@ -234,6 +234,19 @@ button:disabled {
   background: #b91c1c;
 }
 
+.backend-online-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  background: #ecfdf5;
+  border: 1px solid #86efac;
+  border-radius: 10px;
+  padding: 12px 16px;
+  color: #166534;
+  font-size: 14px;
+}
+
 /* Library loading spinner */
 .library-loading {
   display: flex;
@@ -1448,6 +1461,7 @@ button:disabled {
 [data-theme="dark"] .backend-error-banner  { background: #1c0a0a; border-color: #7f1d1d; color: #fca5a5; }
 [data-theme="dark"] .backend-error-banner button { background: #7f1d1d; }
 [data-theme="dark"] .backend-error-banner button:hover { background: #991b1b; }
+[data-theme="dark"] .backend-online-banner { background: #052e16; border-color: #166534; color: #86efac; }
 
 /* Loading spinner */
 [data-theme="dark"] .library-loading       { color: #64748b; }
@@ -2867,7 +2881,8 @@ kbd {
   .chat-form input  { font-size: 16px; } /* 16px prevents iOS auto-zoom */
 
   /* ── Backend error banner: stack ── */
-  .backend-error-banner { flex-direction: column; align-items: stretch; gap: 8px; }
+  .backend-error-banner,
+  .backend-online-banner { flex-direction: column; align-items: stretch; gap: 8px; }
   .backend-error-banner span { flex: 1; }
   .backend-error-banner button { text-align: center; }
 

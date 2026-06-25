@@ -57,6 +57,9 @@ cd /opt/myinsta/backend
 sudo systemctl restart myinsta.service
 ```
 
+The backend requires `yt-dlp[default]>=2026.6.9`; older 2025 builds can fail on
+current YouTube player signatures even when the cookie file is valid.
+
 ## Transcript and chat translation
 
 `POST /api/videos/{video_id}/cleanup?target_language=en` cleans a ready

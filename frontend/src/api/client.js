@@ -233,6 +233,32 @@ export function getChatHistory(videoId) {
   return request(`/api/videos/${videoId}/chat`)
 }
 
+export function listWikiDocuments(videoId) {
+  return request(`/api/videos/${videoId}/wiki`)
+}
+
+export function syncWikiDocument(videoId) {
+  return request(`/api/videos/${videoId}/wiki`, {
+    method: 'POST',
+    timeoutMs: TRANSLATION_TIMEOUT_MS,
+  })
+}
+
+export function getWikiDocument(videoId, documentId) {
+  return request(`/api/videos/${videoId}/wiki/${documentId}`)
+}
+
+export function deleteWikiDocument(videoId, documentId) {
+  return request(`/api/videos/${videoId}/wiki/${documentId}`, {
+    method: 'DELETE',
+  })
+}
+
+export function getWikiDownloadUrl(document) {
+  if (!document?.download_url) return null
+  return `${API_BASE_URL}${document.download_url}`
+}
+
 export function exportToNotion(videoId, apiKey, databaseId) {
   return request(`/api/videos/${videoId}/export-notion`, {
     method: 'POST',

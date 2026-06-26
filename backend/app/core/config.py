@@ -10,6 +10,7 @@ class Settings(BaseSettings):
     download_dir: str = "./data/downloads"
     audio_dir: str = "./data/audio"
     library_dir: str = "./data/library"
+    wiki_dir: str = "./data/mywiki"
     cors_origins: str = "http://localhost:5173,http://127.0.0.1:5173"
     whisper_model: str = "base"
     brave_search_api_key: str = ""   # Get free key at brave.com/search/api/
@@ -44,6 +45,10 @@ class Settings(BaseSettings):
     @cached_property
     def library_path(self) -> Path:
         return Path(self.library_dir)
+
+    @cached_property
+    def wiki_path(self) -> Path:
+        return Path(self.wiki_dir)
 
 
 settings = Settings()

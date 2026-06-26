@@ -26,6 +26,8 @@ from app.models.video import (
     VideoCreateRequest,
     VideoResponse,
     VideoUpdateRequest,
+    WikiDocumentContentResponse,
+    WikiDocumentResponse,
 )
 from app.services.audio_extractor import extract_audio, extract_audio_mp3
 from app.services.video_compressor import compress_video
@@ -42,6 +44,12 @@ from app.services.library_storage import (
 from app.services.transcriber import detect_content_type, transcribe_audio
 from app.services.translator import translate_to_arabic
 from app.services.video_downloader import download_video
+from app.services.wiki_storage import (
+    build_wiki_markdown,
+    delete_wiki_file,
+    make_wiki_filename,
+    write_wiki_markdown,
+)
 
 router = APIRouter(prefix="/videos", tags=["videos"])
 
@@ -60,7 +68,33 @@ def _audio_has_file(row) -> bool:
     return mp3_path.exists() or Path(wav_path).exists()
 
 
-def _row_to_video_response(row, transcript_row=None) -> VideoResponse:
+def _row_to_wiki_document_response(row) -> WikiDocumentResponse:
+    return WikiDocumentResponse(
+        id=row["id"],
+        video_id=row["video_id"],
+        title=row["title"],
+        filename=row["filename"],
+        download_url=f"/api/videos/{row['video_id']}/wiki/{row['id']}/download",
+        view_url=f"/api/videos/{row['video_id']}/wiki/{row['id']}",
+        created_at=row["created_at"],
+        updated_at=row["updated_at"],
+    )
+
+
+def _wiki_documents_for_video(conn, video_id: int) -> list[WikiDocumentResponse]:
+    rows = conn.execute(
+        """
+        SELECT id, video_id, title, filename, file_path, created_at, updated_at
+        FROM wiki_documents
+        WHERE video_id = ?
+        ORDER BY updated_at DESC, id DESC
+        """,
+        (video_id,),
+    ).fetchall()
+    return [_row_to_wiki_document_response(row) for row in rows]
+
+
+def _row_to_video_response(row, transcript_row=None, wiki_documents=None) -> VideoResponse:
     transcript = None
     if transcript_row:
         segments = None
@@ -102,9 +136,77 @@ def _row_to_video_response(row, transcript_row=None) -> VideoResponse:
         deleted_at=row["deleted_at"] if "deleted_at" in row.keys() else None,
         processing_step=row["processing_step"] if "processing_step" in row.keys() else None,
         transcript=transcript,
+        wiki_documents=wiki_documents or [],
         created_at=row["created_at"],
         updated_at=row["updated_at"],
     )
+
+
+def _sync_wiki_document(conn, video_id: int) -> WikiDocumentResponse | None:
+    video = conn.execute(
+        "SELECT * FROM videos WHERE id = ? AND deleted_at IS NULL",
+        (video_id,),
+    ).fetchone()
+    if not video:
+        return None
+    transcript = conn.execute(
+        "SELECT * FROM transcripts WHERE video_id = ?",
+        (video_id,),
+    ).fetchone()
+    if not transcript or not (transcript["full_text"] or "").strip():
+        return None
+
+    messages = conn.execute(
+        """
+        SELECT role, content, created_at
+        FROM chat_messages
+        WHERE video_id = ?
+        ORDER BY created_at ASC, id ASC
+        """,
+        (video_id,),
+    ).fetchall()
+    existing = conn.execute(
+        "SELECT * FROM wiki_documents WHERE video_id = ?",
+        (video_id,),
+    ).fetchone()
+
+    title = video["title"] or f"Video #{video_id}"
+    filename = existing["filename"] if existing else make_wiki_filename(video_id, title)
+    file_path = existing["file_path"] if existing else str((settings.wiki_path / filename).resolve())
+
+    tags = json.loads(video["tags"]) if "tags" in video.keys() and video["tags"] else []
+    markdown = build_wiki_markdown(
+        video={**dict(video), "tags": tags},
+        transcript=dict(transcript),
+        messages=[dict(message) for message in messages],
+    )
+    write_wiki_markdown(Path(file_path), markdown)
+
+    if existing:
+        conn.execute(
+            """
+            UPDATE wiki_documents
+            SET title = ?, filename = ?, file_path = ?
+            WHERE id = ?
+            """,
+            (title, filename, file_path, existing["id"]),
+        )
+        row_id = existing["id"]
+    else:
+        cursor = conn.execute(
+            """
+            INSERT INTO wiki_documents (video_id, title, filename, file_path)
+            VALUES (?, ?, ?, ?)
+            """,
+            (video_id, title, filename, file_path),
+        )
+        row_id = cursor.lastrowid
+
+    row = conn.execute(
+        "SELECT * FROM wiki_documents WHERE id = ?",
+        (row_id,),
+    ).fetchone()
+    return _row_to_wiki_document_response(row)
 
 
 def _detect_supported_platform(url: str) -> str:
@@ -262,6 +364,7 @@ def process_video(video_id: int) -> None:
                 "UPDATE videos SET status = ?, error_message = NULL WHERE id = ?",
                 ("ready", video_id),
             )
+            _sync_wiki_document(conn, video_id)
     except Exception as exc:
         _mark_video_failed(video_id, str(exc))
 
@@ -411,6 +514,12 @@ def permanent_delete_video(video_id: int) -> None:
         if not row:
             raise HTTPException(status_code=404, detail="Video not found in trash")
         storage_folder = row["storage_folder"]
+        wiki_rows = conn.execute(
+            "SELECT file_path FROM wiki_documents WHERE video_id = ?",
+            (video_id,),
+        ).fetchall()
+        for wiki_row in wiki_rows:
+            delete_wiki_file(wiki_row["file_path"])
         conn.execute("DELETE FROM videos WHERE id = ?", (video_id,))
     delete_library_folder(settings.library_path, storage_folder)
 
@@ -427,7 +536,8 @@ def get_video(video_id: int) -> VideoResponse:
             "SELECT * FROM transcripts WHERE video_id = ?",
             (video_id,),
         ).fetchone()
-        return _row_to_video_response(row, transcript_row)
+        wiki_documents = _wiki_documents_for_video(conn, video_id)
+        return _row_to_video_response(row, transcript_row, wiki_documents)
 
 
 @router.patch("/{video_id}", response_model=VideoResponse)
@@ -472,7 +582,7 @@ def update_video(video_id: int, payload: VideoUpdateRequest) -> VideoResponse:
                     """
                     UPDATE transcripts
                     SET full_text = ?, translation_ar = NULL, cleaned_text = NULL,
-                        cleaned_translation_ar = NULL
+                        cleaned_translation_ar = NULL, professional_review = NULL
                     WHERE video_id = ?
                     """,
                     (payload.transcript_text, video_id),
@@ -487,6 +597,9 @@ def update_video(video_id: int, payload: VideoUpdateRequest) -> VideoResponse:
                 )
             if row["local_transcript_path"]:
                 update_transcript_file(Path(row["local_transcript_path"]), payload.transcript_text)
+
+        if updates or payload.transcript_text is not None:
+            _sync_wiki_document(conn, video_id)
 
     return get_video(video_id)
 
@@ -587,6 +700,7 @@ def translate_video_transcript(video_id: int) -> TranscriptTranslationResponse:
             "UPDATE transcripts SET translation_ar = ? WHERE video_id = ?",
             (translated_text, video_id),
         )
+        _sync_wiki_document(conn, video_id)
 
     return TranscriptTranslationResponse(
         video_id=video_id,
@@ -660,6 +774,7 @@ def clean_video_transcript(video_id: int, target_language: str = "en") -> Transc
                 "UPDATE transcripts SET cleaned_text = ? WHERE video_id = ?",
                 (output_text, video_id),
             )
+        _sync_wiki_document(conn, video_id)
 
     return TranscriptCleanupResponse(
         video_id=video_id,
@@ -716,8 +831,107 @@ def review_video_transcript(video_id: int) -> TranscriptReviewResponse:
             "UPDATE transcripts SET professional_review = ? WHERE video_id = ?",
             (review_text, video_id),
         )
+        _sync_wiki_document(conn, video_id)
 
     return TranscriptReviewResponse(video_id=video_id, review_text=review_text)
+
+
+@router.get("/{video_id}/wiki", response_model=list[WikiDocumentResponse])
+def list_video_wiki_documents(video_id: int) -> list[WikiDocumentResponse]:
+    with get_connection() as conn:
+        row = conn.execute(
+            "SELECT id FROM videos WHERE id = ? AND deleted_at IS NULL",
+            (video_id,),
+        ).fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="Video not found")
+        return _wiki_documents_for_video(conn, video_id)
+
+
+@router.post("/{video_id}/wiki", response_model=WikiDocumentResponse)
+def sync_video_wiki_document(video_id: int) -> WikiDocumentResponse:
+    with get_connection() as conn:
+        row = conn.execute(
+            "SELECT id, status FROM videos WHERE id = ? AND deleted_at IS NULL",
+            (video_id,),
+        ).fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="Video not found")
+        if row["status"] != "ready":
+            raise HTTPException(
+                status_code=400,
+                detail="Wiki document is available only after transcription finishes.",
+            )
+        document = _sync_wiki_document(conn, video_id)
+        if not document:
+            raise HTTPException(status_code=400, detail="Transcript is empty.")
+        return document
+
+
+@router.get("/{video_id}/wiki/{document_id}/download")
+def download_video_wiki_document(video_id: int, document_id: int) -> FileResponse:
+    with get_connection() as conn:
+        row = conn.execute(
+            """
+            SELECT * FROM wiki_documents
+            WHERE id = ? AND video_id = ?
+            """,
+            (document_id, video_id),
+        ).fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="Wiki document not found")
+
+    path = Path(row["file_path"])
+    if not path.exists() or not path.is_file():
+        raise HTTPException(status_code=404, detail="Wiki file not found on disk")
+    return FileResponse(
+        path,
+        media_type="text/markdown; charset=utf-8",
+        filename=row["filename"],
+    )
+
+
+@router.get("/{video_id}/wiki/{document_id}", response_model=WikiDocumentContentResponse)
+def get_video_wiki_document(video_id: int, document_id: int) -> WikiDocumentContentResponse:
+    with get_connection() as conn:
+        row = conn.execute(
+            """
+            SELECT * FROM wiki_documents
+            WHERE id = ? AND video_id = ?
+            """,
+            (document_id, video_id),
+        ).fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="Wiki document not found")
+
+    path = Path(row["file_path"])
+    if not path.exists() or not path.is_file():
+        raise HTTPException(status_code=404, detail="Wiki file not found on disk")
+    return WikiDocumentContentResponse(
+        id=row["id"],
+        video_id=row["video_id"],
+        title=row["title"],
+        filename=row["filename"],
+        content=path.read_text(encoding="utf-8"),
+        created_at=row["created_at"],
+        updated_at=row["updated_at"],
+    )
+
+
+@router.delete("/{video_id}/wiki/{document_id}", status_code=204)
+def delete_video_wiki_document(video_id: int, document_id: int) -> None:
+    with get_connection() as conn:
+        row = conn.execute(
+            """
+            SELECT * FROM wiki_documents
+            WHERE id = ? AND video_id = ?
+            """,
+            (document_id, video_id),
+        ).fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="Wiki document not found")
+        delete_wiki_file(row["file_path"])
+        conn.execute("DELETE FROM wiki_documents WHERE id = ?", (document_id,))
 
 
 def _format_chat_answer_language(answer: str, answer_language: str) -> str:
@@ -994,6 +1208,7 @@ def chat_with_video(video_id: int, payload: ChatRequest) -> ChatResponse:
             "SELECT id, role, content, created_at FROM chat_messages WHERE id = ?",
             (assistant_cursor.lastrowid,),
         ).fetchone()
+        _sync_wiki_document(conn, video_id)
 
     return ChatResponse(
         video_id=video_id,

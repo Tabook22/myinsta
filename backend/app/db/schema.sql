@@ -46,6 +46,24 @@ CREATE TABLE IF NOT EXISTS chat_messages (
     FOREIGN KEY (video_id) REFERENCES videos(id) ON DELETE CASCADE
 );
 
+CREATE TABLE IF NOT EXISTS wiki_documents (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    video_id INTEGER NOT NULL UNIQUE,
+    title TEXT NOT NULL,
+    filename TEXT NOT NULL,
+    file_path TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+    FOREIGN KEY (video_id) REFERENCES videos(id) ON DELETE CASCADE
+);
+
+CREATE TRIGGER IF NOT EXISTS trg_wiki_documents_updated_at
+AFTER UPDATE ON wiki_documents
+FOR EACH ROW
+BEGIN
+    UPDATE wiki_documents SET updated_at = datetime('now') WHERE id = OLD.id;
+END;
+
 CREATE TRIGGER IF NOT EXISTS trg_videos_updated_at
 AFTER UPDATE ON videos
 FOR EACH ROW

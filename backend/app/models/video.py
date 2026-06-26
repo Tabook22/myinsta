@@ -1,6 +1,6 @@
 from typing import Any, Literal
 
-from pydantic import BaseModel, HttpUrl
+from pydantic import BaseModel, Field, HttpUrl
 
 
 VideoStatus = Literal["queued", "processing", "ready", "failed"]
@@ -31,6 +31,27 @@ class TranscriptResponse(BaseModel):
     segments: list[dict[str, Any]] | None = None
 
 
+class WikiDocumentResponse(BaseModel):
+    id: int
+    video_id: int
+    title: str
+    filename: str
+    download_url: str
+    view_url: str
+    created_at: str
+    updated_at: str
+
+
+class WikiDocumentContentResponse(BaseModel):
+    id: int
+    video_id: int
+    title: str
+    filename: str
+    content: str
+    created_at: str
+    updated_at: str
+
+
 class VideoResponse(BaseModel):
     id: int
     source_url: str
@@ -54,6 +75,7 @@ class VideoResponse(BaseModel):
     deleted_at: str | None = None
     processing_step: str | None = None
     transcript: TranscriptResponse | None = None
+    wiki_documents: list[WikiDocumentResponse] = Field(default_factory=list)
     created_at: str
     updated_at: str
 

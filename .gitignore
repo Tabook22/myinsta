@@ -19,6 +19,7 @@ dist/
 backend/data/downloads/*
 backend/data/audio/*
 backend/data/library/*
+backend/data/mywiki/*
 !backend/data/**/.gitkeep
 frontend/dist/
 

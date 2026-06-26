@@ -20,6 +20,18 @@ MIGRATIONS = [
     "ALTER TABLE transcripts ADD COLUMN cleaned_translation_ar TEXT",
     "ALTER TABLE transcripts ADD COLUMN professional_review TEXT",
     "ALTER TABLE videos ADD COLUMN description_translation_ar TEXT",
+    """
+    CREATE TABLE IF NOT EXISTS wiki_documents (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        video_id INTEGER NOT NULL UNIQUE,
+        title TEXT NOT NULL,
+        filename TEXT NOT NULL,
+        file_path TEXT NOT NULL,
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+        FOREIGN KEY (video_id) REFERENCES videos(id) ON DELETE CASCADE
+    )
+    """,
 ]
 
 
@@ -43,6 +55,7 @@ def init_db() -> None:
     settings.download_path.mkdir(parents=True, exist_ok=True)
     settings.audio_path.mkdir(parents=True, exist_ok=True)
     settings.library_path.mkdir(parents=True, exist_ok=True)
+    settings.wiki_path.mkdir(parents=True, exist_ok=True)
     with get_connection() as conn:
         conn.executescript(SCHEMA_PATH.read_text(encoding="utf-8"))
         _run_migrations(conn)

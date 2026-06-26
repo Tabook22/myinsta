@@ -99,6 +99,8 @@ export const translations = {
     audioTrack: 'Audio track',
     downloadAudioTitle: 'Download audio file',
     download: 'Download',
+    close: 'Close',
+    loading: 'Loading...',
     audioBrowserFallback: 'Your browser does not support audio playback.',
 
     // ── Notes editor ─────────────────────────────────────────────────────────
@@ -161,6 +163,14 @@ export const translations = {
     translatingTranscript: 'Translating...',
     translatingDescription: 'Translating...',
     copyProfessionalReview: 'Copy review',
+    myWiki: 'MyWiki',
+    wikiSubtitle: 'Markdown archive attached to this video: transcript, review, notes, and discussion.',
+    wikiRefresh: 'Refresh',
+    wikiCreateUpdate: 'Create / update MD',
+    wikiSaving: 'Saving...',
+    wikiEmpty: 'No wiki document yet.',
+    wikiUpdatedAt: (value) => `Updated ${value}`,
+    wikiDeleteConfirm: (name) => `Delete "${name}" from MyWiki?`,
 
     // ── Tags ─────────────────────────────────────────────────────────────────
     fieldTags: 'Tags',
@@ -373,6 +383,8 @@ export const translations = {
     audioTrack: 'المقطع الصوتي',
     downloadAudioTitle: 'تحميل الملف الصوتي',
     download: 'تحميل',
+    close: 'إغلاق',
+    loading: 'جارٍ التحميل...',
     audioBrowserFallback: 'متصفحك لا يدعم تشغيل الصوت.',
 
     // ── Notes editor ─────────────────────────────────────────────────────────
@@ -435,6 +447,14 @@ export const translations = {
     translatingTranscript: 'جارٍ الترجمة...',
     translatingDescription: 'جارٍ الترجمة...',
     copyProfessionalReview: 'نسخ المراجعة',
+    myWiki: 'ماي ويكي',
+    wikiSubtitle: 'أرشيف Markdown مرتبط بهذا الفيديو: النص، المراجعة، الملاحظات، والنقاش.',
+    wikiRefresh: 'تحديث',
+    wikiCreateUpdate: 'إنشاء / تحديث MD',
+    wikiSaving: 'جارٍ الحفظ...',
+    wikiEmpty: 'لا يوجد ملف ويكي بعد.',
+    wikiUpdatedAt: (value) => `آخر تحديث ${value}`,
+    wikiDeleteConfirm: (name) => `حذف "${name}" من ماي ويكي؟`,
 
     // ── Tags ─────────────────────────────────────────────────────────────────
     fieldTags: 'الوسوم',

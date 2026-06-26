@@ -6,6 +6,7 @@ import NotesEditor from './NotesEditor.jsx'
 import NotionExport from './NotionExport.jsx'
 import ProcessingSteps from './ProcessingSteps.jsx'
 import VideoPlayer from './VideoPlayer.jsx'
+import WikiDocuments from './WikiDocuments.jsx'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function formatDuration(seconds) {
@@ -191,6 +192,7 @@ export default function VideoDetails({ video, allVideos = [] }) {
 
       {/* Notion export */}
       {video.status === 'ready' && <NotionExport video={video} />}
+      <WikiDocuments video={video} />
 
       <NotesEditor video={video} />
     </section>

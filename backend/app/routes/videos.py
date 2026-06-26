@@ -21,6 +21,7 @@ from app.models.video import (
     DescriptionTranslationResponse,
     NotionExportRequest,
     TranscriptCleanupResponse,
+    TranscriptReviewResponse,
     TranscriptTranslationResponse,
     VideoCreateRequest,
     VideoResponse,
@@ -30,6 +31,7 @@ from app.services.audio_extractor import extract_audio, extract_audio_mp3
 from app.services.video_compressor import compress_video
 from app.services.chat_service import answer_from_transcript
 from app.services.transcript_cleanup import clean_transcript_text
+from app.services.transcript_review import build_professional_review
 from app.services.web_search import search_web
 from app.services.library_storage import (
     delete_library_folder,
@@ -70,6 +72,7 @@ def _row_to_video_response(row, transcript_row=None) -> VideoResponse:
             "translation_ar": transcript_row["translation_ar"] if "translation_ar" in transcript_row.keys() else None,
             "cleaned_text": transcript_row["cleaned_text"] if "cleaned_text" in transcript_row.keys() else None,
             "cleaned_translation_ar": transcript_row["cleaned_translation_ar"] if "cleaned_translation_ar" in transcript_row.keys() else None,
+            "professional_review": transcript_row["professional_review"] if "professional_review" in transcript_row.keys() else None,
             "segments": segments,
         }
 
@@ -181,6 +184,20 @@ def process_video(video_id: int) -> None:
             transcript_result["full_text"],
             download_result.get("duration_seconds"),
         )
+        professional_review = None
+        if (transcript_result.get("full_text") or "").strip():
+            try:
+                professional_review = build_professional_review(
+                    transcript_result["full_text"],
+                    transcript_result.get("segments"),
+                    title=download_result.get("title"),
+                    description=download_result.get("description"),
+                    platform=platform,
+                    uploader=download_result.get("uploader"),
+                    duration_seconds=download_result.get("duration_seconds"),
+                )
+            except Exception:
+                professional_review = None
 
         library_result = save_to_library(
             settings.library_path,
@@ -229,13 +246,15 @@ def process_video(video_id: int) -> None:
             )
             conn.execute(
                 """
-                INSERT OR REPLACE INTO transcripts (video_id, language, full_text, segments_json)
-                VALUES (?, ?, ?, ?)
+                INSERT OR REPLACE INTO transcripts
+                    (video_id, language, full_text, professional_review, segments_json)
+                VALUES (?, ?, ?, ?, ?)
                 """,
                 (
                     video_id,
                     transcript_result["language"],
                     transcript_result["full_text"],
+                    professional_review,
                     json.dumps(transcript_result["segments"]),
                 ),
             )
@@ -647,6 +666,58 @@ def clean_video_transcript(video_id: int, target_language: str = "en") -> Transc
         target_language=target_language,
         cleaned_text=output_text,
     )
+
+
+@router.post("/{video_id}/review", response_model=TranscriptReviewResponse)
+def review_video_transcript(video_id: int) -> TranscriptReviewResponse:
+    with get_connection() as conn:
+        row = conn.execute(
+            """
+            SELECT v.id, v.status, v.title, v.description, v.platform, v.uploader,
+                   v.duration_seconds, t.full_text, t.segments_json, t.professional_review
+            FROM videos v
+            LEFT JOIN transcripts t ON v.id = t.video_id
+            WHERE v.id = ? AND v.deleted_at IS NULL
+            """,
+            (video_id,),
+        ).fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="Video not found")
+        if row["status"] != "ready":
+            raise HTTPException(
+                status_code=400,
+                detail="Professional review is available only after transcription finishes.",
+            )
+
+        cached = (row["professional_review"] or "").strip() if "professional_review" in row.keys() else ""
+        if cached:
+            return TranscriptReviewResponse(video_id=video_id, review_text=cached)
+
+        full_text = (row["full_text"] or "").strip() if row["full_text"] else ""
+        if not full_text:
+            raise HTTPException(status_code=400, detail="Transcript is empty.")
+        segments = json.loads(row["segments_json"]) if row["segments_json"] else None
+
+    try:
+        review_text = build_professional_review(
+            full_text,
+            segments,
+            title=row["title"],
+            description=row["description"],
+            platform=row["platform"],
+            uploader=row["uploader"],
+            duration_seconds=row["duration_seconds"],
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Professional review failed: {exc}") from exc
+
+    with get_connection() as conn:
+        conn.execute(
+            "UPDATE transcripts SET professional_review = ? WHERE video_id = ?",
+            (review_text, video_id),
+        )
+
+    return TranscriptReviewResponse(video_id=video_id, review_text=review_text)
 
 
 def _format_chat_answer_language(answer: str, answer_language: str) -> str:

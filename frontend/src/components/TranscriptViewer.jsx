@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { cleanTranscript } from '../api/client.js'
+import { cleanTranscript, reviewTranscript } from '../api/client.js'
 import { useLanguage } from '../context/LanguageContext.jsx'
 import QuoteCardModal from './QuoteCardModal.jsx'
 
@@ -11,6 +11,7 @@ export default function TranscriptViewer({ status, transcript, video }) {
   const [viewMode, setViewMode] = useState('original')
   const [cleanedText, setCleanedText] = useState(transcript?.cleaned_text || '')
   const [arabicText, setArabicText] = useState(transcript?.cleaned_translation_ar || transcript?.translation_ar || '')
+  const [reviewText, setReviewText] = useState(transcript?.professional_review || '')
   const [cleanupTarget, setCleanupTarget] = useState('')
   const [cleanupError, setCleanupError] = useState('')
 
@@ -18,19 +19,29 @@ export default function TranscriptViewer({ status, transcript, video }) {
     setViewMode('original')
     setCleanedText(transcript?.cleaned_text || '')
     setArabicText(transcript?.cleaned_translation_ar || transcript?.translation_ar || '')
+    setReviewText(transcript?.professional_review || '')
     setCleanupTarget('')
     setCleanupError('')
     setSelectedQuote('')
-  }, [transcript?.full_text, transcript?.translation_ar, transcript?.cleaned_text, transcript?.cleaned_translation_ar])
+  }, [
+    transcript?.full_text,
+    transcript?.translation_ar,
+    transcript?.cleaned_text,
+    transcript?.cleaned_translation_ar,
+    transcript?.professional_review,
+  ])
 
-  const displayText = viewMode === 'arabic'
-    ? arabicText
-    : viewMode === 'cleaned'
-      ? cleanedText
-      : transcript?.full_text
+  const displayText = viewMode === 'review'
+    ? reviewText
+    : viewMode === 'arabic'
+      ? arabicText
+      : viewMode === 'cleaned'
+        ? cleanedText
+        : transcript?.full_text
   const canClean = Boolean(transcript?.full_text?.trim())
   const isCleaningEnglish = cleanupTarget === 'en'
   const isCleaningArabic = cleanupTarget === 'ar'
+  const isReviewing = cleanupTarget === 'review'
 
   async function handleCopy() {
     if (!displayText) return
@@ -84,6 +95,26 @@ export default function TranscriptViewer({ status, transcript, video }) {
       const result = await cleanTranscript(video.id, 'ar')
       setArabicText(result.cleaned_text)
       setViewMode('arabic')
+    } catch (err) {
+      setCleanupError(err.message)
+    } finally {
+      setCleanupTarget('')
+    }
+  }
+
+  async function handleShowReview() {
+    if (!canClean) return
+    setCleanupError('')
+    if (reviewText) {
+      setViewMode('review')
+      return
+    }
+
+    setCleanupTarget('review')
+    try {
+      const result = await reviewTranscript(video.id)
+      setReviewText(result.review_text)
+      setViewMode('review')
     } catch (err) {
       setCleanupError(err.message)
     } finally {
@@ -148,12 +179,26 @@ export default function TranscriptViewer({ status, transcript, video }) {
               >
                 {isCleaningArabic ? t('cleaningTranscript') : t('arabicTranscript')}
               </button>
+              <button
+                type="button"
+                className={viewMode === 'review' ? 'transcript-mode-active' : ''}
+                onClick={handleShowReview}
+                disabled={Boolean(cleanupTarget)}
+              >
+                {isReviewing ? t('reviewingTranscript') : t('professionalReview')}
+              </button>
             </div>
           )}
           {displayText && (
             <button type="button"
               className={`copy-transcript-btn${copied ? ' copy-transcript-btn-done' : ''}`}
-              onClick={handleCopy} title={t(viewMode === 'arabic' ? 'copyArabicTranscript' : 'copyTranscript')}>
+              onClick={handleCopy} title={t(
+                viewMode === 'arabic'
+                  ? 'copyArabicTranscript'
+                  : viewMode === 'review'
+                    ? 'copyProfessionalReview'
+                    : 'copyTranscript'
+              )}>
               {copied ? (
                 <>
                   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
@@ -169,7 +214,13 @@ export default function TranscriptViewer({ status, transcript, video }) {
                     <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
                     <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
                   </svg>
-                  {t(viewMode === 'arabic' ? 'copyArabicTranscript' : 'copyTranscript')}
+                  {t(
+                    viewMode === 'arabic'
+                      ? 'copyArabicTranscript'
+                      : viewMode === 'review'
+                        ? 'copyProfessionalReview'
+                        : 'copyTranscript'
+                  )}
                 </>
               )}
             </button>

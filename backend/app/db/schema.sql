@@ -30,6 +30,7 @@ CREATE TABLE IF NOT EXISTS transcripts (
     translation_ar TEXT,
     cleaned_text TEXT,
     cleaned_translation_ar TEXT,
+    professional_review TEXT,
     segments_json TEXT,
     created_at TEXT NOT NULL DEFAULT (datetime('now')),
     updated_at TEXT NOT NULL DEFAULT (datetime('now')),

@@ -27,6 +27,7 @@ class TranscriptResponse(BaseModel):
     translation_ar: str | None = None
     cleaned_text: str | None = None
     cleaned_translation_ar: str | None = None
+    professional_review: str | None = None
     segments: list[dict[str, Any]] | None = None
 
 
@@ -96,6 +97,11 @@ class TranscriptCleanupResponse(BaseModel):
     video_id: int
     target_language: Literal["en", "ar"]
     cleaned_text: str
+
+
+class TranscriptReviewResponse(BaseModel):
+    video_id: int
+    review_text: str
 
 
 class DescriptionTranslationResponse(BaseModel):

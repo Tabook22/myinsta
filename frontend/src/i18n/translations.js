@@ -155,9 +155,12 @@ export const translations = {
     originalTranscript: 'Original',
     cleanTranscript: 'Cleaned',
     arabicTranscript: 'Arabic',
+    professionalReview: 'Review',
     cleaningTranscript: 'Cleaning...',
+    reviewingTranscript: 'Reviewing...',
     translatingTranscript: 'Translating...',
     translatingDescription: 'Translating...',
+    copyProfessionalReview: 'Copy review',
 
     // ── Tags ─────────────────────────────────────────────────────────────────
     fieldTags: 'Tags',
@@ -426,9 +429,12 @@ export const translations = {
     originalTranscript: 'الأصل',
     cleanTranscript: 'منقح',
     arabicTranscript: 'العربية',
+    professionalReview: 'مراجعة',
     cleaningTranscript: 'جارٍ التنقيح...',
+    reviewingTranscript: 'جارٍ المراجعة...',
     translatingTranscript: 'جارٍ الترجمة...',
     translatingDescription: 'جارٍ الترجمة...',
+    copyProfessionalReview: 'نسخ المراجعة',
 
     // ── Tags ─────────────────────────────────────────────────────────────────
     fieldTags: 'الوسوم',

@@ -18,6 +18,7 @@ MIGRATIONS = [
     "ALTER TABLE transcripts ADD COLUMN translation_ar TEXT",
     "ALTER TABLE transcripts ADD COLUMN cleaned_text TEXT",
     "ALTER TABLE transcripts ADD COLUMN cleaned_translation_ar TEXT",
+    "ALTER TABLE transcripts ADD COLUMN professional_review TEXT",
     "ALTER TABLE videos ADD COLUMN description_translation_ar TEXT",
 ]
 

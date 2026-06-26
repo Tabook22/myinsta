@@ -173,6 +173,13 @@ export function cleanTranscript(videoId, targetLanguage = 'en') {
   })
 }
 
+export function reviewTranscript(videoId) {
+  return request(`/api/videos/${videoId}/review`, {
+    method: 'POST',
+    timeoutMs: TRANSLATION_TIMEOUT_MS,
+  })
+}
+
 export function translateDescriptionToArabic(videoId) {
   return request(`/api/videos/${videoId}/translate-description`, {
     method: 'POST',

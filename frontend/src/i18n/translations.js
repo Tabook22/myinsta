@@ -8,6 +8,7 @@ export const translations = {
     // ── App ──────────────────────────────────────────────────────────────────
     appName: 'MyInsta',
     appSubtitle: 'Paste an Instagram or YouTube link, save it to your library, transcribe it, then chat with the transcript.',
+    heroKicker: 'Your private video library',
     langLabel: 'Language',
 
     // ── Backend / connection ─────────────────────────────────────────────────
@@ -20,13 +21,27 @@ export const translations = {
     urlPlaceholder: 'Instagram or YouTube video URL',
     processVideo: 'Process video',
     submitting: 'Submitting...',
+    captureHeading: 'Save a video',
+    captureHint: 'Drop a public Reel, Post, or YouTube link — we download, transcribe, and keep it local.',
+    chipInstagram: 'Instagram Reel',
+    chipYoutube: 'YouTube video',
+    chipTranscript: 'Searchable transcript',
     duplicateUrlConfirm: (label) =>
       `"${label}" is already in your library.\n\nOK = open the saved video\nCancel = process this URL again`,
+    toastVideoQueued: 'Video queued — processing started.',
+    toastVideoDeleted: 'Moved to trash.',
+    toastRetryStarted: 'Retry started — reprocessing video.',
 
     // ── Video library ────────────────────────────────────────────────────────
     yourVideos: 'Your saved videos',
     librarySubtitle: 'View, edit, or delete any saved video from your library.',
     noVideos: 'No saved videos yet. Paste an Instagram or YouTube link above to get started.',
+    noVideosMatch: 'No videos match this filter. Try another search or clear filters.',
+    emptyLibraryTitle: 'Your shelf is ready',
+    emptyLibraryBody: 'Paste a link above to start a calm personal archive of videos, transcripts, and notes.',
+    emptyStep1: 'Paste link',
+    emptyStep2: 'Transcribe',
+    emptyStep3: 'Chat & notes',
     colTitle: 'Title',
     colSavedAs: 'Saved as',
     colStatus: 'Status',
@@ -303,6 +318,7 @@ export const translations = {
     // ── App ──────────────────────────────────────────────────────────────────
     appName: 'ماي إنستا',
     appSubtitle: 'الصق رابط فيديو من إنستاجرام أو يوتيوب، احفظه في مكتبتك، استخرج نصه، ثم تحدث معه.',
+    heroKicker: 'مكتبتك الخاصة للفيديو',
     langLabel: 'اللغة',
 
     // ── Backend / connection ─────────────────────────────────────────────────
@@ -315,13 +331,27 @@ export const translations = {
     urlPlaceholder: 'رابط فيديو من إنستاجرام أو يوتيوب',
     processVideo: 'معالجة الفيديو',
     submitting: 'جارٍ الإرسال...',
+    captureHeading: 'احفظ فيديو',
+    captureHint: 'أسقط رابط ريفيل أو منشور أو يوتيوب عام — نحوّله إلى نص ونحفظه محلياً.',
+    chipInstagram: 'ريفيل إنستاجرام',
+    chipYoutube: 'فيديو يوتيوب',
+    chipTranscript: 'نص قابل للبحث',
     duplicateUrlConfirm: (label) =>
       `"${label}" موجود بالفعل في مكتبتك.\n\nموافق = فتح الفيديو المحفوظ\nإلغاء = معالجة هذا الرابط مرة أخرى`,
+    toastVideoQueued: 'تمت إضافة الفيديو — بدأت المعالجة.',
+    toastVideoDeleted: 'نُقل إلى المهملات.',
+    toastRetryStarted: 'بدأت إعادة المحاولة — جارٍ إعادة المعالجة.',
 
     // ── Video library ────────────────────────────────────────────────────────
     yourVideos: 'مقاطع الفيديو الخاصة بك',
     librarySubtitle: 'اعرض أو عدّل أو احذف أي فيديو محفوظ من مكتبتك.',
     noVideos: 'لا توجد مقاطع فيديو بعد. الصق رابط إنستاجرام أو يوتيوب أعلاه للبدء.',
+    noVideosMatch: 'لا توجد مقاطع تطابق هذا التصفية. جرّب بحثاً آخر أو امسح الفلاتر.',
+    emptyLibraryTitle: 'رفّك جاهز',
+    emptyLibraryBody: 'الصق رابطاً أعلاه لبدء أرشيف شخصي هادئ للفيديوهات والنصوص والملاحظات.',
+    emptyStep1: 'الصق الرابط',
+    emptyStep2: 'انسخ النص',
+    emptyStep3: 'دردشة وملاحظات',
     colTitle: 'العنوان',
     colSavedAs: 'محفوظ كـ',
     colStatus: 'الحالة',

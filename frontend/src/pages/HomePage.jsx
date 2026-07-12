@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 
-import { createVideo, getVideo, listVideosPaginated } from '../api/client.js'
+import { createVideo, getVideo, listVideosPaginated, retryVideo } from '../api/client.js'
 import { useLanguage } from '../context/LanguageContext.jsx'
 import { useTheme } from '../context/ThemeContext.jsx'
+import { useToast } from '../context/ToastContext.jsx'
 import ChatPanel from '../components/ChatPanel.jsx'
 import OnboardingModal, { shouldShowOnboarding, markOnboardingDone } from '../components/OnboardingModal.jsx'
 import ShortcutsModal from '../components/ShortcutsModal.jsx'
@@ -93,6 +94,7 @@ function ThemeToggle() {
 // ── Page ─────────────────────────────────────────────────────────────────────
 export default function HomePage() {
   const { t } = useLanguage()
+  const { showToast } = useToast()
   const [video, setVideo]               = useState(null)
   const [recentVideos, setRecentVideos]   = useState([])
   const [totalVideos,  setTotalVideos]    = useState(0)
@@ -105,13 +107,15 @@ export default function HomePage() {
   const [showEditor, setShowEditor]     = useState(false)
   const [error, setError]               = useState('')
   const [backendError, setBackendError] = useState('')
-  const [backendOnline, setBackendOnline] = useState(false)
+  const [showOnlineBanner, setShowOnlineBanner] = useState(false)
+  const [onlineBannerHiding, setOnlineBannerHiding] = useState(false)
   const [loadingLibrary, setLoadingLibrary] = useState(true)
   const [showOnboarding, setShowOnboarding] = useState(shouldShowOnboarding)
   const [showShortcuts, setShowShortcuts]   = useState(false)
   const [statsKey, setStatsKey]         = useState(0) // bump to re-fetch stats
   const detailRef   = useRef(null)
   const prevStatus  = useRef(null)  // track status changes for notifications
+  const wasOffline  = useRef(false)
 
   async function loadRecentVideos() {
     // Reset to first page
@@ -123,10 +127,17 @@ export default function HomePage() {
       setHasMore(more)
       offsetRef.current = items.length
       setBackendError('')
-      setBackendOnline(true)
+      // Only flash online banner after recovery or first successful connect
+      if (wasOffline.current || !sessionStorage.getItem('myinsta-online-seen')) {
+        setShowOnlineBanner(true)
+        setOnlineBannerHiding(false)
+        sessionStorage.setItem('myinsta-online-seen', '1')
+      }
+      wasOffline.current = false
     } catch (err) {
       setBackendError(err.message)
-      setBackendOnline(false)
+      wasOffline.current = true
+      setShowOnlineBanner(false)
     } finally {
       setLoadingLibrary(false)
     }
@@ -148,12 +159,27 @@ export default function HomePage() {
       offsetRef.current += items.length
     } catch (err) {
       setError(err.message)
+      showToast(err.message, 'error')
     } finally {
       setIsLoadingMore(false)
     }
   }
 
   useEffect(() => { loadRecentVideos() }, [])
+
+  // Auto-dismiss backend online banner
+  useEffect(() => {
+    if (!showOnlineBanner) return undefined
+    const hideTimer = window.setTimeout(() => setOnlineBannerHiding(true), 2600)
+    const removeTimer = window.setTimeout(() => {
+      setShowOnlineBanner(false)
+      setOnlineBannerHiding(false)
+    }, 3000)
+    return () => {
+      window.clearTimeout(hideTimer)
+      window.clearTimeout(removeTimer)
+    }
+  }, [showOnlineBanner])
 
   function normalizeUrl(value) {
     return (value || '').trim().replace(/\/+$/, '').toLowerCase()
@@ -185,10 +211,15 @@ export default function HomePage() {
       setVideo(created)
       prevStatus.current = created.status
       setShowEditor(false)
+      showToast(t('toastVideoQueued'), 'success')
       await loadRecentVideos()
       setStatsKey((k) => k + 1)
+      window.setTimeout(() => {
+        detailRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      }, 80)
     } catch (err) {
       setError(err.message)
+      showToast(err.message, 'error')
     } finally {
       setIsSubmitting(false)
     }
@@ -206,6 +237,7 @@ export default function HomePage() {
       }, 50)
     } catch (err) {
       setError(err.message)
+      showToast(err.message, 'error')
     }
   }
 
@@ -220,6 +252,22 @@ export default function HomePage() {
     setShowEditor(false)
     loadRecentVideos()
     setStatsKey((k) => k + 1)
+    showToast(t('toastVideoDeleted'), 'info')
+  }
+
+  async function handleRetryVideo(videoId) {
+    try {
+      const updated = await retryVideo(videoId)
+      showToast(t('toastRetryStarted'), 'success')
+      if (video?.id === videoId) {
+        setVideo(updated)
+        prevStatus.current = updated.status
+      }
+      await loadRecentVideos()
+      setStatsKey((k) => k + 1)
+    } catch (err) {
+      showToast(err.message, 'error')
+    }
   }
 
   // Global keyboard shortcuts
@@ -253,6 +301,7 @@ export default function HomePage() {
         if (prevStatus.current !== 'ready' && refreshed.status === 'ready') {
           const title = refreshed.title || t('untitledVideo')
           fireNotification(t('notificationReady', title), t('notificationBody'))
+          showToast(t('notificationReady', title), 'success')
           await loadRecentVideos()
           setStatsKey((k) => k + 1)
         }
@@ -262,6 +311,7 @@ export default function HomePage() {
             t('notificationFailed', title),
             refreshed.error_message || t('notificationFailedBody'),
           )
+          showToast(refreshed.error_message || t('notificationFailed', title), 'error')
           await loadRecentVideos()
         }
         prevStatus.current = refreshed.status
@@ -270,7 +320,9 @@ export default function HomePage() {
       }
     }, 1500)
     return () => clearInterval(timer)
-  }, [video, t])
+  }, [video, t, showToast])
+
+  const hasLibrary = totalVideos > 0 || recentVideos.length > 0
 
   return (
     <main className="page">
@@ -286,6 +338,7 @@ export default function HomePage() {
       <section className="hero">
         <div className="hero-top">
           <div className="hero-text">
+            <p className="hero-kicker">{t('heroKicker')}</p>
             <h1>{t('appName')}</h1>
             <p>{t('appSubtitle')}</p>
           </div>
@@ -308,19 +361,29 @@ export default function HomePage() {
           <button type="button" onClick={loadRecentVideos}>{t('retry')}</button>
         </div>
       )}
-      {!backendError && backendOnline && (
-        <div className="backend-online-banner" role="status">
+      {!backendError && showOnlineBanner && (
+        <div
+          className={`backend-online-banner${onlineBannerHiding ? ' is-hiding' : ''}`}
+          role="status"
+        >
           <span>{t('backendOnline')}</span>
         </div>
       )}
 
-      <section className="card">
+      <section className="card capture-card">
+        <p className="capture-heading">{t('captureHeading')}</p>
+        <p className="capture-hint">{t('captureHint')}</p>
         <UrlSubmitForm onSubmit={handleSubmit} isSubmitting={isSubmitting} />
+        <div className="capture-chips" aria-hidden="true">
+          <span className="capture-chip">▶ {t('chipInstagram')}</span>
+          <span className="capture-chip">▶ {t('chipYoutube')}</span>
+          <span className="capture-chip">✎ {t('chipTranscript')}</span>
+        </div>
         {error ? <p className="error">{error}</p> : null}
       </section>
 
-      {/* Stats panel — re-fetches when statsKey changes */}
-      <StatsPanel key={statsKey} />
+      {/* Stats panel — only when library has content */}
+      {hasLibrary && <StatsPanel key={statsKey} />}
 
       {loadingLibrary ? (
         <div className="library-loading">
@@ -338,6 +401,7 @@ export default function HomePage() {
           onView={(videoId) => openVideo(videoId, { edit: false })}
           onEdit={(videoId) => openVideo(videoId, { edit: true })}
           onDeleted={handleVideoDeleted}
+          onRetry={handleRetryVideo}
           onRefresh={loadRecentVideos}
         />
       )}
@@ -359,7 +423,7 @@ export default function HomePage() {
               />
             ) : (
               <div className="detail-actions">
-                <button type="button" onClick={() => setShowEditor(true)}>
+                <button type="button" className="btn-secondary" onClick={() => setShowEditor(true)}>
                   {t('editThisVideo')}
                 </button>
               </div>

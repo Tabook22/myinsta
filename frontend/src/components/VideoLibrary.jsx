@@ -167,12 +167,13 @@ function TagChips({ tags, activeTag, onTagClick, size = 'sm' }) {
 
 // ── Grid card ─────────────────────────────────────────────────────────────────
 function VideoCard({
-  item, selected, favorite, onSelect, onView, onEdit, onDelete, onToggleFavorite,
+  item, selected, favorite, onSelect, onView, onEdit, onDelete, onRetry, onToggleFavorite,
   activeTag, onTagClick, t, locale,
 }) {
   const [isHovering, setIsHovering] = useState(false)
   const hoverTimer  = useRef(null)
   const videoUrl    = getVideoStreamUrl(item)
+  const isFailed    = item.status === 'failed'
 
   function handleMouseEnter() {
     if (!videoUrl) return
@@ -184,7 +185,7 @@ function VideoCard({
   }
 
   return (
-    <div className={`lib-card${selected ? ' lib-card-selected' : ''}`}
+    <div className={`lib-card${selected ? ' lib-card-selected' : ''}${isFailed ? ' lib-card-failed' : ''}`}
       onMouseEnter={handleMouseEnter} onMouseLeave={handleMouseLeave}>
       {/* Checkbox */}
       <input
@@ -247,6 +248,16 @@ function VideoCard({
 
       {/* Actions */}
       <div className="lib-card-actions">
+        {isFailed && onRetry && (
+          <button type="button" className="icon-btn icon-btn-retry" title={t('retryProcessing')}
+            onClick={() => onRetry(item.id)}>
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+              stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="23 4 23 10 17 10"/>
+              <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
+            </svg>
+          </button>
+        )}
         <button type="button" className="icon-btn icon-btn-view" title={t('view')}
           onClick={() => onView(item.id)}>
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
@@ -279,7 +290,7 @@ function VideoCard({
 }
 
 // ── Action icon buttons for table rows ───────────────────────────────────────
-function RowActions({ item, favorite, onView, onEdit, onDelete, onToggleFavorite, t }) {
+function RowActions({ item, favorite, onView, onEdit, onDelete, onRetry, onToggleFavorite, t }) {
   return (
     <div className="library-actions">
       <button type="button"
@@ -288,6 +299,16 @@ function RowActions({ item, favorite, onView, onEdit, onDelete, onToggleFavorite
         onClick={() => onToggleFavorite(item.id)}>
         {favorite ? '★' : '☆'}
       </button>
+      {item.status === 'failed' && onRetry && (
+        <button type="button" className="icon-btn icon-btn-retry" title={t('retryProcessing')}
+          onClick={() => onRetry(item.id)}>
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+            stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="23 4 23 10 17 10"/>
+            <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
+          </svg>
+        </button>
+      )}
       <button type="button" className="icon-btn icon-btn-view" title={t('view')} onClick={() => onView(item.id)}>
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
           stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -318,13 +339,13 @@ function RowActions({ item, favorite, onView, onEdit, onDelete, onToggleFavorite
 // ── Main component ────────────────────────────────────────────────────────────
 export default function VideoLibrary({
   videos, totalVideos = 0, hasMore = false, isLoadingMore = false,
-  onLoadMore, selectedId, onView, onEdit, onDeleted, onRefresh,
+  onLoadMore, selectedId, onView, onEdit, onDeleted, onRetry, onRefresh,
 }) {
   const { t, lang } = useLanguage()
   const locale = lang === 'ar' ? 'ar-SA' : 'en-US'
 
-  // Persistent preferences
-  const [viewMode, setViewMode] = useState(() => localStorage.getItem('lib-view') || 'list')
+  // Persistent preferences — default to grid for a more visual library
+  const [viewMode, setViewMode] = useState(() => localStorage.getItem('lib-view') || 'grid')
   const [sortBy,   setSortBy]   = useState(() => localStorage.getItem('lib-sort') || 'newest')
   const [favoriteIds, setFavoriteIds] = useState(() => {
     try { return new Set(JSON.parse(localStorage.getItem('lib-favorites') || '[]')) }
@@ -652,8 +673,20 @@ export default function VideoLibrary({
       )}
 
       {/* ── Empty state ── */}
-      {!filtered.length && (
-        <p className="library-empty">{t('noVideos')}</p>
+      {!filtered.length && videos.length === 0 && (
+        <div className="library-empty-state">
+          <div className="library-empty-icon" aria-hidden="true">📚</div>
+          <h4>{t('emptyLibraryTitle')}</h4>
+          <p>{t('emptyLibraryBody')}</p>
+          <div className="library-empty-steps">
+            <span className="library-empty-step"><span>1</span>{t('emptyStep1')}</span>
+            <span className="library-empty-step"><span>2</span>{t('emptyStep2')}</span>
+            <span className="library-empty-step"><span>3</span>{t('emptyStep3')}</span>
+          </div>
+        </div>
+      )}
+      {!filtered.length && videos.length > 0 && (
+        <p className="library-empty">{t('noVideosMatch')}</p>
       )}
 
       {/* ── Grid view ── */}
@@ -669,6 +702,7 @@ export default function VideoLibrary({
               onView={onView}
               onEdit={onEdit}
               onDelete={handleDelete}
+              onRetry={onRetry}
               onToggleFavorite={toggleFavorite}
               activeTag={activeTag}
               onTagClick={(tag) => setActiveTag(activeTag === tag ? null : tag)}
@@ -722,6 +756,7 @@ export default function VideoLibrary({
                     className={[
                       selectedId === item.id ? 'library-row-active' : '',
                       selectedIds.has(item.id) ? 'library-row-selected' : '',
+                      item.status === 'failed' ? 'row-failed' : '',
                     ].filter(Boolean).join(' ')}>
                     <td>
                       <input type="checkbox"
@@ -774,6 +809,7 @@ export default function VideoLibrary({
                         onView={onView}
                         onEdit={onEdit}
                         onDelete={handleDelete}
+                        onRetry={onRetry}
                         onToggleFavorite={toggleFavorite}
                         t={t}
                       />

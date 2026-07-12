@@ -19,8 +19,10 @@ export default function UrlSubmitForm({ onSubmit, isSubmitting }) {
         value={url}
         onChange={(event) => setUrl(event.target.value)}
         required
+        autoComplete="url"
+        inputMode="url"
       />
-      <button type="submit" disabled={isSubmitting}>
+      <button type="submit" className="btn-primary" disabled={isSubmitting}>
         {isSubmitting ? t('submitting') : t('processVideo')}
       </button>
     </form>

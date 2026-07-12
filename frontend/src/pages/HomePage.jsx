@@ -155,11 +155,28 @@ export default function HomePage() {
 
   useEffect(() => { loadRecentVideos() }, [])
 
+  function normalizeUrl(value) {
+    return (value || '').trim().replace(/\/+$/, '').toLowerCase()
+  }
+
   async function handleSubmit(url) {
     // Request notification permission on first submit (requires user gesture)
     requestNotificationPermission()
     // Dismiss onboarding on first real action
     if (showOnboarding) { markOnboardingDone(); setShowOnboarding(false) }
+
+    const existing = recentVideos.find(
+      (item) => normalizeUrl(item.source_url) === normalizeUrl(url),
+    )
+    if (existing) {
+      const label = existing.title || t('videoHash', existing.id)
+      const openExisting = window.confirm(t('duplicateUrlConfirm', label))
+      if (openExisting) {
+        await openVideo(existing.id, { edit: false })
+        return
+      }
+      // User chose to process again — continue below
+    }
 
     setIsSubmitting(true)
     setError('')
@@ -232,18 +249,22 @@ export default function HomePage() {
         const refreshed = await getVideo(video.id)
         setVideo(refreshed)
 
-        // Fire notification on status transition → ready
+        // Fire notification on status transition → ready / failed
         if (prevStatus.current !== 'ready' && refreshed.status === 'ready') {
           const title = refreshed.title || t('untitledVideo')
           fireNotification(t('notificationReady', title), t('notificationBody'))
           await loadRecentVideos()
           setStatsKey((k) => k + 1)
         }
-        prevStatus.current = refreshed.status
-
-        if (refreshed.status === 'failed') {
+        if (prevStatus.current !== 'failed' && refreshed.status === 'failed') {
+          const title = refreshed.title || t('untitledVideo')
+          fireNotification(
+            t('notificationFailed', title),
+            refreshed.error_message || t('notificationFailedBody'),
+          )
           await loadRecentVideos()
         }
+        prevStatus.current = refreshed.status
       } catch (err) {
         setError(err.message)
       }
@@ -288,8 +309,8 @@ export default function HomePage() {
         </div>
       )}
       {!backendError && backendOnline && (
-        <div className="backend-online-banner">
-          <span>Backend online: Server is responding.</span>
+        <div className="backend-online-banner" role="status">
+          <span>{t('backendOnline')}</span>
         </div>
       )}
 
@@ -324,7 +345,11 @@ export default function HomePage() {
       {video ? (
         <section className="grid" ref={detailRef}>
           <div className="card">
-            <VideoDetails video={video} allVideos={recentVideos} />
+            <VideoDetails
+              video={video}
+              allVideos={recentVideos}
+              onVideoUpdated={handleVideoUpdated}
+            />
             <TranscriptViewer status={video.status} transcript={video.transcript} video={video} />
             {showEditor ? (
               <VideoEditor

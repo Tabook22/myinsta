@@ -437,3 +437,65 @@ def test_chat_answer_language_modes(client, monkeypatch):
     assert bilingual_answer.startswith("English:\n")
     assert "\n\nArabic:\nإجابة عربية" in bilingual_answer
     assert len(calls) == 2
+
+
+def test_retry_failed_video(client, monkeypatch):
+    called = []
+
+    def fake_process(video_id: int) -> None:
+        called.append(video_id)
+        with get_connection() as conn:
+            conn.execute(
+                """
+                UPDATE videos
+                SET status = ?, error_message = NULL, processing_step = NULL, title = ?
+                WHERE id = ?
+                """,
+                ("ready", "Retried video", video_id),
+            )
+
+    monkeypatch.setattr(videos_routes, "process_video", fake_process)
+
+    with get_connection() as conn:
+        cursor = conn.execute(
+            """
+            INSERT INTO videos (source_url, status, error_message, processing_step, title)
+            VALUES (?, ?, ?, ?, ?)
+            """,
+            (
+                "https://www.instagram.com/reel/RETRY/",
+                "failed",
+                "Download failed: temporary error",
+                "downloading",
+                "Broken video",
+            ),
+        )
+        video_id = cursor.lastrowid
+
+    response = client.post(f"/api/videos/{video_id}/retry")
+    assert response.status_code == 200
+    body = response.json()
+    assert body["status"] in {"processing", "ready"}
+    assert called == [video_id]
+
+    detail = client.get(f"/api/videos/{video_id}")
+    assert detail.status_code == 200
+    assert detail.json()["status"] == "ready"
+    assert detail.json()["title"] == "Retried video"
+    assert detail.json()["error_message"] is None
+
+
+def test_retry_rejects_ready_video(client):
+    with get_connection() as conn:
+        cursor = conn.execute(
+            """
+            INSERT INTO videos (source_url, status, title)
+            VALUES (?, ?, ?)
+            """,
+            ("https://www.instagram.com/reel/READY-RETRY/", "ready", "Already ready"),
+        )
+        video_id = cursor.lastrowid
+
+    response = client.post(f"/api/videos/{video_id}/retry")
+    assert response.status_code == 400
+    assert "failed" in response.json()["detail"].lower()

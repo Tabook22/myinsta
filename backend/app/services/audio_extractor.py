@@ -7,7 +7,12 @@ def _run_ffmpeg(cmd: list[str], label: str) -> None:
     """Run an ffmpeg command and raise RuntimeError on failure."""
     result = subprocess.run(cmd, capture_output=True, text=True)
     if result.returncode != 0:
-        detail = (result.stderr or result.stdout or "unknown error").strip()
+        raw = (result.stderr or result.stdout or "unknown error").strip()
+        # Prefer the last non-empty line — FFmpeg puts the real error at the end.
+        lines = [line.strip() for line in raw.splitlines() if line.strip()]
+        detail = lines[-1] if lines else "unknown error"
+        if len(detail) > 240:
+            detail = detail[:237] + "..."
         raise RuntimeError(f"FFmpeg {label} failed: {detail}")
 
 

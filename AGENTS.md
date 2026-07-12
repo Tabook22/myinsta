@@ -197,6 +197,7 @@ Base URL during development: `http://localhost:8000`
 - `GET /api/videos/{video_id}/stream` streams the saved local video file.
 - `GET /api/videos/{video_id}/chat` returns saved chat history.
 - `POST /api/videos/{video_id}/chat` stores a user message and returns a simple transcript-grounded assistant answer.
+- `POST /api/videos/{video_id}/retry` re-runs the pipeline for a failed video.
 
 ## Data model summary
 
@@ -238,11 +239,10 @@ Keep `.gitkeep` files where needed to preserve empty data directories.
 
 ## Known review notes / technical debt
 
-- `backend/app/main.py` still uses FastAPI `@app.on_event("startup")`; migrate to lifespan later.
-- Backend tests require `PYTHONPATH=.`.
+- Backend tests usually run via `pytest -q` from `backend/` (pytest.ini sets pythonpath).
 - Docs and README may lag behind newer features; update them whenever API/UI behavior changes.
 - Current chat is simple lexical transcript retrieval. Do not present it as full RAG.
-- The current project folder was observed without a `.git` repository. If version history is desired, initialize git or move work into a repo before relying on diffs.
+- Failed videos can be reprocessed with `POST /api/videos/{id}/retry`.
 
 ## When implementing
 
@@ -257,8 +257,7 @@ Keep `.gitkeep` files where needed to preserve empty data directories.
 
 ## Recommended next work
 
-1. Update README and docs to match the current local MVP feature set.
-2. Add or improve tests around edit/delete/library file behavior.
-3. Add user-facing failure messages for common yt-dlp, FFmpeg, and Whisper errors.
-4. Consider a small backend import/test configuration cleanup so tests do not require manual `PYTHONPATH=.`.
-5. Only after MVP polish, design transcript chunking and future RAG retrieval.
+1. Add more tests around partial pipeline failures and library file cleanup.
+2. Consider subtitle/caption import for YouTube before falling back to Whisper.
+3. Small UX polish: auto-dismiss backend-online banner, richer empty states.
+4. Only after MVP polish, design transcript chunking and future RAG retrieval.

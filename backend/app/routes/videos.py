@@ -32,6 +32,7 @@ from app.models.video import (
 from app.services.audio_extractor import extract_audio, extract_audio_mp3
 from app.services.video_compressor import compress_video
 from app.services.chat_service import answer_from_transcript
+from app.services.pipeline_errors import friendly_pipeline_error
 from app.services.transcript_cleanup import clean_transcript_text
 from app.services.transcript_review import build_professional_review
 from app.services.web_search import search_web
@@ -224,7 +225,11 @@ def _detect_supported_platform(url: str) -> str:
 def _mark_video_failed(video_id: int, error_message: str) -> None:
     with get_connection() as conn:
         conn.execute(
-            "UPDATE videos SET status = ?, error_message = ? WHERE id = ?",
+            """
+            UPDATE videos
+            SET status = ?, error_message = ?, processing_step = NULL
+            WHERE id = ?
+            """,
             ("failed", error_message, video_id),
         )
 
@@ -361,12 +366,16 @@ def process_video(video_id: int) -> None:
                 ),
             )
             conn.execute(
-                "UPDATE videos SET status = ?, error_message = NULL WHERE id = ?",
+                """
+                UPDATE videos
+                SET status = ?, error_message = NULL, processing_step = NULL
+                WHERE id = ?
+                """,
                 ("ready", video_id),
             )
             _sync_wiki_document(conn, video_id)
     except Exception as exc:
-        _mark_video_failed(video_id, str(exc))
+        _mark_video_failed(video_id, friendly_pipeline_error(exc))
 
 
 @router.post("", response_model=VideoResponse, status_code=201)
@@ -500,6 +509,34 @@ def restore_video(video_id: int) -> VideoResponse:
         if not row:
             raise HTTPException(status_code=404, detail="Video not found in trash")
         conn.execute("UPDATE videos SET deleted_at = NULL WHERE id = ?", (video_id,))
+    return get_video(video_id)
+
+
+@router.post("/{video_id}/retry", response_model=VideoResponse)
+def retry_video(video_id: int, background_tasks: BackgroundTasks) -> VideoResponse:
+    """Re-run download → audio → transcript for a failed video."""
+    with get_connection() as conn:
+        row = conn.execute(
+            "SELECT id, status FROM videos WHERE id = ? AND deleted_at IS NULL",
+            (video_id,),
+        ).fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="Video not found")
+        if row["status"] != "failed":
+            raise HTTPException(
+                status_code=400,
+                detail="Only failed videos can be retried. Current status is not failed.",
+            )
+        conn.execute(
+            """
+            UPDATE videos
+            SET status = ?, error_message = NULL, processing_step = ?
+            WHERE id = ?
+            """,
+            ("processing", "downloading", video_id),
+        )
+
+    background_tasks.add_task(process_video, video_id)
     return get_video(video_id)
 
 

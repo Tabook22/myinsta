@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { translateDescriptionToArabic } from '../api/client.js'
+import { retryVideo, translateDescriptionToArabic } from '../api/client.js'
 import { useLanguage } from '../context/LanguageContext.jsx'
 import AudioPlayer from './AudioPlayer.jsx'
 import NotesEditor from './NotesEditor.jsx'
@@ -74,20 +74,22 @@ function CreatorCard({ video, allVideos }) {
 }
 
 // ── Main component ────────────────────────────────────────────────────────────
-export default function VideoDetails({ video, allVideos = [] }) {
+export default function VideoDetails({ video, allVideos = [], onRetry, onVideoUpdated }) {
   const { t } = useLanguage()
   const duration = formatDuration(video.duration_seconds)
   const [descriptionMode, setDescriptionMode] = useState('original')
   const [arabicDescription, setArabicDescription] = useState(video.description_translation_ar || '')
   const [isTranslatingDescription, setIsTranslatingDescription] = useState(false)
   const [descriptionTranslationError, setDescriptionTranslationError] = useState('')
+  const [isRetrying, setIsRetrying] = useState(false)
+  const [retryError, setRetryError] = useState('')
 
   useEffect(() => {
     setDescriptionMode('original')
     setArabicDescription(video.description_translation_ar || '')
     setDescriptionTranslationError('')
-  }, [video.id, video.description, video.description_translation_ar])
-
+    setRetryError('')
+  }, [video.id, video.description, video.description_translation_ar, video.status])
   const displayedDescription =
     descriptionMode === 'arabic' ? arabicDescription : video.description
 
@@ -108,6 +110,20 @@ export default function VideoDetails({ video, allVideos = [] }) {
       setDescriptionTranslationError(err.message)
     } finally {
       setIsTranslatingDescription(false)
+    }
+  }
+
+  async function handleRetry() {
+    setRetryError('')
+    setIsRetrying(true)
+    try {
+      const updated = await retryVideo(video.id)
+      onVideoUpdated?.(updated)
+      onRetry?.(updated)
+    } catch (err) {
+      setRetryError(err.message)
+    } finally {
+      setIsRetrying(false)
     }
   }
 
@@ -186,7 +202,25 @@ export default function VideoDetails({ video, allVideos = [] }) {
           </p>
         </div>
       ) : null}
-      {video.error_message ? (
+      {video.status === 'failed' ? (
+        <div className="failure-panel" role="alert">
+          <div className="failure-panel-header">
+            <strong>{t('processingFailed')}</strong>
+            <button
+              type="button"
+              className="failure-retry-btn"
+              onClick={handleRetry}
+              disabled={isRetrying}
+            >
+              {isRetrying ? t('retrying') : t('retryProcessing')}
+            </button>
+          </div>
+          <p className="failure-panel-message">
+            {video.error_message || t('processingFailedUnknown')}
+          </p>
+          {retryError ? <p className="error">{retryError}</p> : null}
+        </div>
+      ) : video.error_message ? (
         <p className="error">{video.error_message}</p>
       ) : null}
 

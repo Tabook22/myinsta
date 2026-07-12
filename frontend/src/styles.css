@@ -326,6 +326,61 @@ button:disabled {
   color: #b91c1c;
 }
 
+/* Failed processing panel */
+.failure-panel {
+  margin: 14px 0 8px;
+  padding: 14px 16px;
+  border-radius: 12px;
+  border: 1px solid #fca5a5;
+  background: #fef2f2;
+  color: #7f1d1d;
+}
+
+.failure-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.failure-panel-message {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.5;
+  word-break: break-word;
+}
+
+.failure-retry-btn {
+  flex-shrink: 0;
+  background: #dc2626;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 7px 14px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.failure-retry-btn:hover:not(:disabled) {
+  background: #b91c1c;
+}
+
+.failure-retry-btn:disabled {
+  opacity: 0.7;
+  cursor: wait;
+}
+
+[data-theme="dark"] .failure-panel {
+  background: #1c0a0a;
+  border-color: #7f1d1d;
+  color: #fecaca;
+}
+
+[data-theme="dark"] .failure-retry-btn {
+  background: #b91c1c;
+}
+
 /* Backend offline banner */
 .backend-error-banner {
   display: flex;

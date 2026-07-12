@@ -281,3 +281,7 @@ export function restoreVideo(videoId) {
 export function permanentDeleteVideo(videoId) {
   return request(`/api/videos/${videoId}/permanent`, { method: 'DELETE' })
 }
+
+export function retryVideo(videoId) {
+  return request(`/api/videos/${videoId}/retry`, { method: 'POST' })
+}

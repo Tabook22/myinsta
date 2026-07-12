@@ -12,6 +12,7 @@ export const translations = {
 
     // ── Backend / connection ─────────────────────────────────────────────────
     backendOffline: '⚠️ Backend offline:',
+    backendOnline: '✓ Backend online — server is responding.',
     retry: 'Retry',
     connectingToServer: 'Connecting to server…',
 
@@ -19,6 +20,8 @@ export const translations = {
     urlPlaceholder: 'Instagram or YouTube video URL',
     processVideo: 'Process video',
     submitting: 'Submitting...',
+    duplicateUrlConfirm: (label) =>
+      `"${label}" is already in your library.\n\nOK = open the saved video\nCancel = process this URL again`,
 
     // ── Video library ────────────────────────────────────────────────────────
     yourVideos: 'Your saved videos',
@@ -211,6 +214,14 @@ export const translations = {
     // ── Notification ─────────────────────────────────────────────────────────
     notificationReady: (title) => `✅ "${title}" is ready!`,
     notificationBody: 'Your video has been transcribed. You can now chat with it.',
+    notificationFailed: (title) => `⚠️ "${title}" failed`,
+    notificationFailedBody: 'Processing failed. Open the video to see the error and retry.',
+
+    // ── Failure / retry ──────────────────────────────────────────────────────
+    processingFailed: 'Processing failed',
+    processingFailedUnknown: 'Something went wrong while processing this video.',
+    retryProcessing: 'Retry processing',
+    retrying: 'Retrying…',
 
     // ── Notion export ────────────────────────────────────────────────────────
     notionExport:       'Notion',
@@ -296,6 +307,7 @@ export const translations = {
 
     // ── Backend / connection ─────────────────────────────────────────────────
     backendOffline: '⚠️ الخادم غير متصل:',
+    backendOnline: '✓ الخادم متصل — الخادم يستجيب.',
     retry: 'إعادة المحاولة',
     connectingToServer: 'جارٍ الاتصال بالخادم…',
 
@@ -303,6 +315,8 @@ export const translations = {
     urlPlaceholder: 'رابط فيديو من إنستاجرام أو يوتيوب',
     processVideo: 'معالجة الفيديو',
     submitting: 'جارٍ الإرسال...',
+    duplicateUrlConfirm: (label) =>
+      `"${label}" موجود بالفعل في مكتبتك.\n\nموافق = فتح الفيديو المحفوظ\nإلغاء = معالجة هذا الرابط مرة أخرى`,
 
     // ── Video library ────────────────────────────────────────────────────────
     yourVideos: 'مقاطع الفيديو الخاصة بك',
@@ -495,6 +509,14 @@ export const translations = {
     // ── Notification ─────────────────────────────────────────────────────────
     notificationReady: (title) => `✅ "${title}" جاهز!`,
     notificationBody: 'تم نسخ الفيديو الخاص بك. يمكنك الآن التحدث معه.',
+    notificationFailed: (title) => `⚠️ فشل "${title}"`,
+    notificationFailedBody: 'فشلت المعالجة. افتح الفيديو لرؤية الخطأ وإعادة المحاولة.',
+
+    // ── Failure / retry ──────────────────────────────────────────────────────
+    processingFailed: 'فشلت المعالجة',
+    processingFailedUnknown: 'حدث خطأ أثناء معالجة هذا الفيديو.',
+    retryProcessing: 'إعادة المعالجة',
+    retrying: 'جارٍ إعادة المحاولة…',
 
     // ── Notion export ────────────────────────────────────────────────────────
     notionExport:       'نوشن',

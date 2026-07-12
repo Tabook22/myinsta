@@ -5,7 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import settings
 from app.db.database import init_db
-from app.routes import health, search, videos
+from app.routes import health, search, settings as settings_routes, videos
 
 
 @asynccontextmanager
@@ -29,3 +29,4 @@ app.add_middleware(
 app.include_router(health.router)
 app.include_router(videos.router, prefix="/api")
 app.include_router(search.router, prefix="/api")
+app.include_router(settings_routes.router, prefix="/api")

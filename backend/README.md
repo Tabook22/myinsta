@@ -52,6 +52,16 @@ python -m yt_dlp --js-runtimes node --remote-components ejs:github \
 
 Incomplete cookies (SID only, no `LOGIN_INFO`) are **skipped** — they make bot checks worse.
 
+### Upload cookies from the website (recommended)
+
+In the app UI: **⚙ Settings → YouTube cookies → choose cookies.txt → Upload & save**.
+
+- API: `GET/POST /api/settings/youtube-cookies`
+- File is written to `YOUTUBE_COOKIES_FILE` (or app default under `data/`)
+- Rejects uploads **without `LOGIN_INFO`**
+- No restart required after a successful upload — click **Retry** on a failed video
+- **Privacy:** cookies are secrets; only use on a private self-hosted deploy
+
 ### Cookie rules (this caused most failures)
 
 1. Export from **https://www.youtube.com** while **signed in** (avatar visible).

@@ -52,5 +52,13 @@ class Settings(BaseSettings):
     def wiki_path(self) -> Path:
         return Path(self.wiki_dir)
 
+    @property
+    def youtube_cookies_path(self) -> Path:
+        """Resolved path for the YouTube cookies.txt file (upload target)."""
+        if self.youtube_cookies_file.strip():
+            return Path(self.youtube_cookies_file).expanduser()
+        # Default app-managed location (gitignored under data/)
+        return Path(self.download_dir).resolve().parent / "youtube_cookies.txt"
+
 
 settings = Settings()

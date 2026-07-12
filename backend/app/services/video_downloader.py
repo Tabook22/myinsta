@@ -74,15 +74,28 @@ def _normalize_url(url: str, platform: str) -> str:
 
 
 def _youtube_cookies_file() -> Path | None:
-    for candidate in (
-        settings.youtube_cookies_file,
-        settings.instagram_cookies_file,
-    ):
-        if not candidate:
+    """Prefer configured / uploaded YouTube cookies path, then Instagram fallback."""
+    candidates: list[Path] = []
+    try:
+        candidates.append(settings.youtube_cookies_path)
+    except Exception:
+        pass
+    if settings.youtube_cookies_file.strip():
+        candidates.append(Path(settings.youtube_cookies_file))
+    if settings.instagram_cookies_file.strip():
+        candidates.append(Path(settings.instagram_cookies_file))
+
+    seen: set[str] = set()
+    for path in candidates:
+        key = str(path)
+        if key in seen:
             continue
-        path = Path(candidate)
-        if path.is_file() and path.stat().st_size > 32:
-            return path
+        seen.add(key)
+        try:
+            if path.is_file() and path.stat().st_size > 32:
+                return path
+        except OSError:
+            continue
     return None
 
 

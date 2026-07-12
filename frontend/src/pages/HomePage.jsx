@@ -5,6 +5,7 @@ import { useLanguage } from '../context/LanguageContext.jsx'
 import { useTheme } from '../context/ThemeContext.jsx'
 import { useToast } from '../context/ToastContext.jsx'
 import OnboardingModal, { shouldShowOnboarding, markOnboardingDone } from '../components/OnboardingModal.jsx'
+import SettingsModal from '../components/SettingsModal.jsx'
 import ShortcutsModal from '../components/ShortcutsModal.jsx'
 import StatsPanel from '../components/StatsPanel.jsx'
 import StudyWorkspace from '../components/StudyWorkspace.jsx'
@@ -109,6 +110,7 @@ export default function HomePage() {
   const [loadingLibrary, setLoadingLibrary] = useState(true)
   const [showOnboarding, setShowOnboarding] = useState(shouldShowOnboarding)
   const [showShortcuts, setShowShortcuts]   = useState(false)
+  const [showSettings, setShowSettings]     = useState(false)
   const [statsKey, setStatsKey]         = useState(0) // bump to re-fetch stats
   const detailRef   = useRef(null)
   const prevStatus  = useRef(null)  // track status changes for notifications
@@ -278,13 +280,14 @@ export default function HomePage() {
       }
       // Escape → close shortcuts modal or editor
       if (e.key === 'Escape') {
+        if (showSettings)  { setShowSettings(false);  return }
         if (showShortcuts) { setShowShortcuts(false); return }
         if (showEditor)    { setShowEditor(false);    return }
       }
     }
     document.addEventListener('keydown', onKeyDown)
     return () => document.removeEventListener('keydown', onKeyDown)
-  }, [showEditor, showShortcuts])
+  }, [showEditor, showShortcuts, showSettings])
 
   // Polling: refresh video status + fire notification when ready
   useEffect(() => {
@@ -330,6 +333,9 @@ export default function HomePage() {
       {showShortcuts && (
         <ShortcutsModal onClose={() => setShowShortcuts(false)} />
       )}
+      {showSettings && (
+        <SettingsModal onClose={() => setShowSettings(false)} />
+      )}
 
       {/* ── Hero ── */}
       <section className="hero">
@@ -340,6 +346,12 @@ export default function HomePage() {
             <p>{t('appSubtitle')}</p>
           </div>
           <div className="hero-controls">
+            <button type="button" className="settings-open-btn"
+              onClick={() => setShowSettings(true)}
+              title={t('settingsTitle')}
+              aria-label={t('settingsTitle')}>
+              ⚙
+            </button>
             <button type="button" className="shortcuts-hint-btn"
               onClick={() => setShowShortcuts(true)}
               title={t('shortcutsTitle')}

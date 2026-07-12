@@ -84,6 +84,35 @@ export const translations = {
     fieldDescription: 'Description',
     fieldTranscript: 'Transcript',
 
+    // ── Settings ─────────────────────────────────────────────────────────────
+    settingsTitle: 'Settings',
+    settingsYoutubeCookies: 'YouTube cookies',
+    settingsYoutubeHelp:
+      'Upload a Netscape cookies.txt exported while signed into youtube.com. This fixes “Sign in to confirm you’re not a bot” on the VPS without using scp.',
+    settingsPrivacyNote:
+      'Your cookie file is stored only on this server (private deploy). Never share it — it can access your YouTube account.',
+    settingsPickFile: 'Choose a cookies.txt file first.',
+    settingsUploadOk: 'YouTube cookies saved.',
+    settingsCookiesUsable: 'Usable',
+    settingsCookiesNotUsable: 'Not usable',
+    settingsHasLogin: 'LOGIN_INFO',
+    settingsMissingLogin: 'No LOGIN_INFO',
+    settingsHasSession: 'Session cookies',
+    settingsMissingSession: 'No session cookies',
+    settingsPath: 'Save path',
+    settingsSize: 'Size',
+    settingsAge: 'Age',
+    settingsAgeDays: (n) => `${n} days`,
+    settingsYoutubeRows: 'YouTube cookie rows',
+    settingsChooseFile: 'Choose cookies.txt',
+    settingsUploadBtn: 'Upload & save',
+    settingsUploading: 'Uploading…',
+    settingsRefresh: 'Refresh status',
+    settingsStep1: 'On your PC, open youtube.com while signed in and play any video.',
+    settingsStep2: 'Export with “Get cookies.txt LOCALLY” (YouTube tab only).',
+    settingsStep3: 'Upload the file here — it must include LOGIN_INFO.',
+    settingsStep4: 'Retry a failed YouTube video in the library.',
+
     // ── Study workspace ──────────────────────────────────────────────────────
     studyMode: 'Study mode',
     tabOverview: 'Overview',
@@ -421,6 +450,35 @@ export const translations = {
     fieldTitle: 'العنوان',
     fieldDescription: 'الوصف',
     fieldTranscript: 'النص المكتوب',
+
+    // ── Settings ─────────────────────────────────────────────────────────────
+    settingsTitle: 'الإعدادات',
+    settingsYoutubeCookies: 'ملفات تعريف يوتيوب',
+    settingsYoutubeHelp:
+      'ارفع ملف cookies.txt (تنسيق Netscape) وأنت مسجّل الدخول في youtube.com. هذا يصلح رسالة "تأكيد أنك لست روبوتاً" على الخادم دون استخدام scp.',
+    settingsPrivacyNote:
+      'يُحفظ الملف على هذا الخادم فقط (نشر خاص). لا تشاركه — قد يمنح وصولاً لحساب يوتيوب.',
+    settingsPickFile: 'اختر ملف cookies.txt أولاً.',
+    settingsUploadOk: 'تم حفظ ملفات تعريف يوتيوب.',
+    settingsCookiesUsable: 'صالح',
+    settingsCookiesNotUsable: 'غير صالح',
+    settingsHasLogin: 'LOGIN_INFO',
+    settingsMissingLogin: 'بدون LOGIN_INFO',
+    settingsHasSession: 'جلسة',
+    settingsMissingSession: 'بدون جلسة',
+    settingsPath: 'مسار الحفظ',
+    settingsSize: 'الحجم',
+    settingsAge: 'العمر',
+    settingsAgeDays: (n) => `${n} يوم`,
+    settingsYoutubeRows: 'صفوف يوتيوب',
+    settingsChooseFile: 'اختر cookies.txt',
+    settingsUploadBtn: 'رفع وحفظ',
+    settingsUploading: 'جارٍ الرفع…',
+    settingsRefresh: 'تحديث الحالة',
+    settingsStep1: 'على جهازك افتح youtube.com وأنت مسجّل وادخل أي فيديو.',
+    settingsStep2: 'صدّر بامتداد Get cookies.txt LOCALLY من تبويب يوتيوب.',
+    settingsStep3: 'ارفع الملف هنا — يجب أن يحتوي LOGIN_INFO.',
+    settingsStep4: 'أعد محاولة فيديو يوتيوب الفاشل من المكتبة.',
 
     // ── Study workspace ──────────────────────────────────────────────────────
     studyMode: 'وضع الدراسة',

@@ -294,3 +294,45 @@ export function searchLibrary(query, limit = 50) {
   }
   return request(`/api/search/library?q=${encodeURIComponent(q)}&limit=${limit}`)
 }
+
+/** YouTube cookies status (no secret values returned) */
+export function getYoutubeCookiesStatus() {
+  return request('/api/settings/youtube-cookies')
+}
+
+/** Upload Netscape cookies.txt for YouTube */
+export async function uploadYoutubeCookies(file) {
+  const form = new FormData()
+  form.append('file', file)
+
+  const failures = []
+  for (const apiBaseUrl of API_BASE_URLS) {
+    const controller = new AbortController()
+    const timer = setTimeout(() => controller.abort(), TRANSLATION_TIMEOUT_MS)
+    try {
+      const response = await fetch(`${apiBaseUrl}/api/settings/youtube-cookies`, {
+        method: 'POST',
+        body: form,
+        signal: controller.signal,
+        cache: 'no-store',
+      })
+      if (!response.ok) {
+        const text = await response.text()
+        throw new Error(parseErrorMessage(text) || `Upload failed (${response.status})`)
+      }
+      return response.json()
+    } catch (err) {
+      failures.push(err)
+      if (err.message && !err.message.includes('fetch') && err.name !== 'AbortError' && err.name !== 'TypeError') {
+        throw err
+      }
+    } finally {
+      clearTimeout(timer)
+    }
+  }
+  if (failures.some((err) => err.name === 'AbortError')) {
+    throw new Error('Server is not responding — please check back in a moment.')
+  }
+  const last = failures[failures.length - 1]
+  throw last instanceof Error ? last : new Error('Cannot reach server — check your connection.')
+}

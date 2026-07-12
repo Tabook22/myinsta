@@ -432,16 +432,23 @@ def _friendly_download_error(error: Exception, platform: str) -> str:
             or "confirm you're not a bot" in lower
             or ("cookies" in lower and ("required" in lower or "use --cookies" in lower))
         ):
+            report = inspect_youtube_cookies()
+            raw = re.sub(r"\s+", " ", message).strip()
+            if len(raw) > 220:
+                raw = raw[:217] + "..."
+            login_note = ""
+            if report.get("present") and not report.get("has_login_info"):
+                login_note = (
+                    "CRITICAL: cookie file has NO LOGIN_INFO cookie — YouTube treats this "
+                    "as logged-out/bot. Re-export while signed into youtube.com. "
+                )
             return (
                 "YouTube blocked this download (bot/sign-in check). "
+                f"{login_note}"
                 f"{_cookie_status_for(platform)} "
-                "Do this on a machine where YouTube works in the browser: "
-                "(1) Sign into youtube.com, open any video, "
-                "(2) export a NEW cookies.txt with 'Get cookies.txt LOCALLY' "
-                "(must include LOGIN_INFO / SID cookies), "
-                "(3) replace the file on the VPS and restart myinsta.service, "
-                "(4) pip install -U 'yt-dlp[default]' and ensure Node.js is installed. "
-                "Note: old cookies can make blocking worse — re-export weekly."
+                "Export a NEW cookies.txt while signed into youtube.com "
+                "(extension: Get cookies.txt LOCALLY), scp to the VPS, restart myinsta.service. "
+                f"Raw yt-dlp error: {raw}"
             )
 
         if (
@@ -585,15 +592,33 @@ def _attempt_download(
         return extracted, path
 
 
+def _youtube_cli_env() -> dict:
+    """Build env so systemd can find node/ffmpeg like an interactive shell."""
+    import os
+
+    env = os.environ.copy()
+    path_parts = env.get("PATH", "").split(os.pathsep)
+    for extra in ("/usr/local/bin", "/usr/bin", "/bin"):
+        if extra not in path_parts:
+            path_parts.insert(0, extra)
+    env["PATH"] = os.pathsep.join(path_parts)
+    return env
+
+
 def _download_youtube_via_cli(
     url: str, output_dir: Path, video_id: int, cookie_file: Path | None
 ) -> tuple[dict, Path]:
     """
-    Download YouTube using the same yt-dlp CLI flags proven on the VPS.
+    Download YouTube using the exact yt-dlp CLI flags proven on the VPS.
 
-    CLI path is more reliable than the Python API for EJS / node integration.
+    Matches the working command:
+      yt-dlp --js-runtimes node --remote-components ejs:github
+             --cookies FILE -f "best[ext=mp4]/best" -o OUT URL
     """
     outtmpl = str((output_dir / f"{video_id}.%(ext)s").resolve())
+    # Same format string as the successful manual VPS test
+    fmt = "best[ext=mp4]/best"
+
     cmd = [
         sys.executable,
         "-m",
@@ -603,15 +628,13 @@ def _download_youtube_via_cli(
         "--remote-components",
         "ejs:github",
         "-f",
-        "best[ext=mp4][vcodec!=none][acodec!=none]/best[ext=mp4]/best",
+        fmt,
         "--merge-output-format",
         "mp4",
         "--no-playlist",
-        "--no-progress",
+        "--no-warnings",
         "-o",
         outtmpl,
-        "--print-json",
-        "--no-simulate",
     ]
     if cookie_file and cookie_file.is_file():
         cmd.extend(["--cookies", str(cookie_file)])
@@ -622,73 +645,69 @@ def _download_youtube_via_cli(
 
     cmd.append(url)
 
-    # Ensure node is visible even if systemd PATH is minimal
-    env = None
-    try:
-        import os
-
-        env = os.environ.copy()
-        path_parts = env.get("PATH", "").split(os.pathsep)
-        for extra in ("/usr/bin", "/usr/local/bin"):
-            if extra not in path_parts:
-                path_parts.insert(0, extra)
-        env["PATH"] = os.pathsep.join(path_parts)
-    except Exception:
-        env = None
-
     result = subprocess.run(
         cmd,
         capture_output=True,
         text=True,
         timeout=900,
         check=False,
-        env=env,
+        env=_youtube_cli_env(),
+        cwd=str(output_dir),
     )
     if result.returncode != 0:
         err = (result.stderr or result.stdout or "yt-dlp failed").strip()
-        # Keep last useful chunk
         lines = [ln for ln in err.splitlines() if ln.strip()]
-        detail = "\n".join(lines[-12:]) if lines else "yt-dlp failed"
+        detail = "\n".join(lines[-15:]) if lines else "yt-dlp failed"
         raise RuntimeError(detail)
 
-    # --print-json emits one JSON object per line on stdout after download
-    info: dict | None = None
-    for line in reversed((result.stdout or "").splitlines()):
-        line = line.strip()
-        if not line.startswith("{"):
-            continue
-        try:
-            info = json.loads(line)
-            break
-        except json.JSONDecodeError:
-            continue
-
-    path = None
-    if info:
-        # Prefer requested downloads paths
-        req = info.get("requested_downloads") or []
-        if req and req[0].get("filepath"):
-            path = Path(req[0]["filepath"])
-        elif info.get("filename"):
-            path = Path(info["filename"])
-        elif info.get("_filename"):
-            path = Path(info["_filename"])
-
-    if path is None or not path.exists():
-        matches = sorted(
-            p
-            for p in output_dir.glob(f"{video_id}.*")
-            if p.is_file() and p.suffix.lower() not in {".part", ".ytdl", ".temp"}
+    matches = sorted(
+        p
+        for p in output_dir.glob(f"{video_id}.*")
+        if p.is_file() and p.suffix.lower() not in {".part", ".ytdl", ".temp", ".json"}
+    )
+    if not matches:
+        raise RuntimeError(
+            "yt-dlp CLI finished but output file not found. "
+            f"stdout={ (result.stdout or '')[-200:] } stderr={ (result.stderr or '')[-200:] }"
         )
-        if not matches:
-            raise RuntimeError("yt-dlp CLI finished but output file not found")
-        matches.sort(key=lambda p: p.stat().st_size, reverse=True)
-        path = matches[0]
-        if info is None:
-            info = {"title": path.stem, "duration": None}
-
+    matches.sort(key=lambda p: p.stat().st_size, reverse=True)
+    path = matches[0]
     if path.stat().st_size <= 0:
         raise RuntimeError("downloaded file is empty")
+
+    # Second lightweight call for metadata (no download)
+    info: dict = {"title": None, "duration": None}
+    meta_cmd = [
+        sys.executable,
+        "-m",
+        "yt_dlp",
+        "--js-runtimes",
+        "node",
+        "--remote-components",
+        "ejs:github",
+        "--skip-download",
+        "--no-playlist",
+        "-J",
+    ]
+    if cookie_file and cookie_file.is_file():
+        meta_cmd.extend(["--cookies", str(cookie_file)])
+    if proxy:
+        meta_cmd.extend(["--proxy", proxy])
+    meta_cmd.append(url)
+
+    meta = subprocess.run(
+        meta_cmd,
+        capture_output=True,
+        text=True,
+        timeout=180,
+        check=False,
+        env=_youtube_cli_env(),
+    )
+    if meta.returncode == 0 and meta.stdout.strip().startswith("{"):
+        try:
+            info = json.loads(meta.stdout)
+        except json.JSONDecodeError:
+            pass
 
     _check_duration(info, "youtube")
     return info, path

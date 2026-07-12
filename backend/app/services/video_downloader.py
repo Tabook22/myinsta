@@ -125,7 +125,7 @@ def inspect_youtube_cookies(path: Path | None = None) -> dict:
         parts = ln.split("\t")
         if len(parts) < 7:
             # Some exporters use spaces — still count domain hits
-            if "youtube.com" in ln:
+            if "youtube.com" in ln or "google.com" in ln:
                 yt_rows.append(ln)
             continue
         domain, name = parts[0], parts[5]
@@ -136,7 +136,10 @@ def inspect_youtube_cookies(path: Path | None = None) -> dict:
     has_netscape_header = any(
         "Netscape" in ln or "HTTP Cookie File" in ln for ln in lines[:8]
     )
-    has_login = "LOGIN_INFO" in names
+    # Detect LOGIN_INFO even if a line is malformed / not 7 tab fields
+    has_login = ("LOGIN_INFO" in names) or any(
+        "LOGIN_INFO" in ln and "youtube.com" in ln for ln in data_lines
+    )
     has_sid = bool(
         names
         & {
@@ -149,6 +152,11 @@ def inspect_youtube_cookies(path: Path | None = None) -> dict:
             "HSID",
             "SSID",
         }
+    ) or any(
+        f"\t{n}\t" in ln or f"\t{n} " in ln
+        for ln in data_lines
+        for n in ("__Secure-1PSID", "SAPISID", "SID")
+        if "youtube.com" in ln or "google.com" in ln
     )
 
     issues: list[str] = []
@@ -219,14 +227,15 @@ def _cookie_modes_for(platform: str) -> list[dict]:
     modes: list[dict] = []
     cookie_file = _youtube_cookies_file()
     report = inspect_youtube_cookies(cookie_file) if cookie_file else None
-    if cookie_file and report and report.get("youtube_rows", 0) > 0:
+    # Only attach cookies when LOGIN_INFO is present — incomplete files worsen bot checks
+    if cookie_file and report and report.get("usable"):
         modes.append({"cookiefile": str(cookie_file)})
 
     browser = _youtube_browser()
     if browser:
         modes.append({"cookiesfrombrowser": (browser,)})
 
-    # Anonymous fallback (some public videos work without cookies)
+    # Anonymous fallback (public videos; incomplete cookies intentionally skipped)
     modes.append({})
 
     seen: set[str] = set()
@@ -765,10 +774,12 @@ def download_video(
     if platform == "youtube":
         last_cli_error: Exception | None = None
         cookie_file = _youtube_cookies_file()
-        # Prefer cookies when present; also try without
+        report = inspect_youtube_cookies(cookie_file) if cookie_file else None
         cookie_tries: list[Path | None] = []
-        if cookie_file:
+        # Only use cookies that include LOGIN_INFO (usable)
+        if cookie_file and report and report.get("usable"):
             cookie_tries.append(cookie_file)
+        # Always try cookieless with EJS (public videos)
         cookie_tries.append(None)
 
         for cookies in cookie_tries:

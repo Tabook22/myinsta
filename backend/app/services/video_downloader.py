@@ -226,16 +226,63 @@ def _cookie_modes_for(platform: str) -> list[dict]:
     return unique
 
 
+def _node_version() -> tuple[int, int, int] | None:
+    """Return (major, minor, patch) for `node`, or None if missing/unparseable."""
+    node = shutil.which("node")
+    if not node:
+        return None
+    try:
+        import subprocess
+
+        out = subprocess.run(
+            [node, "-v"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+            check=False,
+        )
+        raw = (out.stdout or out.stderr or "").strip().lstrip("v")
+        parts = raw.split(".")
+        major = int(parts[0])
+        minor = int(parts[1]) if len(parts) > 1 else 0
+        patch = int(parts[2].split("-")[0]) if len(parts) > 2 else 0
+        return major, minor, patch
+    except Exception:
+        return None
+
+
+def _js_runtime_opts() -> dict:
+    """
+    Configure JS challenge solving for YouTube (EJS).
+
+    yt-dlp-ejs requires Node >= 22 (or Deno >= 2.3). Older Node is ignored so
+    we can fall back to remote components / other runtimes.
+    """
+    opts: dict = {}
+    runtimes: dict = {}
+
+    node_ver = _node_version()
+    if node_ver and node_ver[0] >= 22:
+        runtimes["node"] = {}
+    elif shutil.which("deno"):
+        runtimes["deno"] = {}
+    elif node_ver:
+        # Too old for ejs — still try; remote components may help on some builds
+        runtimes["node"] = {}
+
+    if runtimes:
+        opts["js_runtimes"] = runtimes
+
+    # Allow yt-dlp to fetch the challenge solver scripts from GitHub/npm.
+    # Critical when the packaged solver is outdated.
+    opts["remote_components"] = {"ejs:github", "ejs:npm"}
+    return opts
+
+
 def _apply_youtube_runtime_options(ydl_opts: dict, platform: str) -> None:
     if platform != "youtube":
         return
-
-    if shutil.which("node"):
-        ydl_opts["js_runtimes"] = {"node": {}}
-
-    # Optional remote EJS solver components (ignored by older yt-dlp builds)
-    ydl_opts.setdefault("remote_components", ["ejs:github"])
-
+    ydl_opts.update(_js_runtime_opts())
 
 def _cookie_status_for(platform: str) -> str:
     if platform != "youtube":
@@ -264,8 +311,18 @@ def _cookie_status_for(platform: str) -> str:
     if browser:
         parts.append(f"Browser cookie source: {browser}.")
 
-    if not shutil.which("node"):
-        parts.append("Node.js is not on PATH (needed for many YouTube signatures).")
+    node_ver = _node_version()
+    if not node_ver:
+        parts.append(
+            "Node.js is not on PATH. Install Node 22+ (required for YouTube n-challenge / EJS)."
+        )
+    elif node_ver[0] < 22:
+        parts.append(
+            f"Node.js v{node_ver[0]}.{node_ver[1]} is too old — yt-dlp EJS needs Node >= 22 "
+            "(or Deno >= 2.3). Upgrade Node, then: pip install -U 'yt-dlp[default]' yt-dlp-ejs"
+        )
+    else:
+        parts.append(f"Node.js v{node_ver[0]}.{node_ver[1]} OK for EJS.")
 
     return " ".join(parts)
 
@@ -385,7 +442,38 @@ def _friendly_download_error(error: Exception, platform: str) -> str:
                 "Note: old cookies can make blocking worse — re-export weekly."
             )
 
-        if "requested format is not available" in lower or "no video formats" in lower:
+        if (
+            "n challenge" in lower
+            or "js interpreter" in lower
+            or "ejs" in lower
+            or "challenge solver" in lower
+            or (
+                "no video formats" in lower
+                and ("challenge" in lower or "jsc" in lower or "signature" in lower)
+            )
+            or "no video formats found" in lower
+        ):
+            node_ver = _node_version()
+            node_note = (
+                f"Node is v{node_ver[0]}.{node_ver[1]} (need >= 22)."
+                if node_ver and node_ver[0] < 22
+                else (
+                    "Node not found."
+                    if not node_ver
+                    else f"Node v{node_ver[0]} OK — enable remote EJS components."
+                )
+            )
+            return (
+                "YouTube JS challenge failed (n-challenge / no formats). "
+                f"{node_note} "
+                "On the VPS: install Node 22+, then "
+                "pip install -U 'yt-dlp[default]' yt-dlp-ejs && "
+                "sudo systemctl restart myinsta.service. "
+                "CLI test: yt-dlp --js-runtimes node --remote-components ejs:github "
+                "--cookies /path/to/youtube_cookies.txt -f 'best[ext=mp4]/best' URL"
+            )
+
+        if "requested format is not available" in lower:
             return (
                 "YouTube did not provide a downloadable format for this video. "
                 "Update yt-dlp (`pip install -U 'yt-dlp[default]'`), refresh cookies, "
@@ -411,15 +499,7 @@ def _friendly_download_error(error: Exception, platform: str) -> str:
             return (
                 "YouTube returned HTTP 403 (forbidden). Refresh cookies, update yt-dlp, "
                 "and try again. If cookies are old, export a fresh file."
-            )
-
-        if "n challenge" in lower or "js interpreter" in lower or "ejs" in lower:
-            return (
-                "YouTube signature challenge failed. Install Node.js on the server and run: "
-                "pip install -U 'yt-dlp[default]' then restart the backend."
-            )
-
-        if "ffmpeg" in lower and ("not found" in lower or "merging" in lower):
+            )        if "ffmpeg" in lower and ("not found" in lower or "merging" in lower):
             return (
                 "Download needed FFmpeg to merge video+audio, but FFmpeg failed or is missing. "
                 "Install FFmpeg on PATH and retry."

@@ -65,12 +65,22 @@ def test_youtube_anonymous_clients_prefer_android_vr():
 
 
 def test_youtube_enables_node_runtime_when_available(monkeypatch):
+    monkeypatch.setattr(video_downloader, "_node_version", lambda: (22, 11, 0))
     monkeypatch.setattr(video_downloader.shutil, "which", lambda name: "/usr/bin/node")
     ydl_opts = {}
     _apply_youtube_runtime_options(ydl_opts, "youtube")
 
     assert ydl_opts["js_runtimes"] == {"node": {}}
     assert "remote_components" in ydl_opts
+    assert "ejs:github" in ydl_opts["remote_components"]
+
+
+def test_no_video_formats_mentions_node22():
+    monkeypatch_msg = _friendly_download_error(
+        RuntimeError("ERROR: [youtube] abc: No video formats found!; n challenge solving failed"),
+        "youtube",
+    )
+    assert "challenge" in monkeypatch_msg.lower() or "Node" in monkeypatch_msg
 
 
 def test_instagram_does_not_set_js_runtime():

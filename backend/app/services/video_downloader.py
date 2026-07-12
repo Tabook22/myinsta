@@ -499,7 +499,9 @@ def _friendly_download_error(error: Exception, platform: str) -> str:
             return (
                 "YouTube returned HTTP 403 (forbidden). Refresh cookies, update yt-dlp, "
                 "and try again. If cookies are old, export a fresh file."
-            )        if "ffmpeg" in lower and ("not found" in lower or "merging" in lower):
+            )
+
+        if "ffmpeg" in lower and ("not found" in lower or "merging" in lower):
             return (
                 "Download needed FFmpeg to merge video+audio, but FFmpeg failed or is missing. "
                 "Install FFmpeg on PATH and retry."

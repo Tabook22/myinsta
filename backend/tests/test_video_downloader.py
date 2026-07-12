@@ -136,7 +136,22 @@ def test_inspect_youtube_cookies_detects_login(tmp_path):
     assert report["present"] is True
     assert report["has_login_info"] is True
     assert report["has_session_ids"] is True
+    assert report["usable"] is True
     assert report["youtube_rows"] >= 2
+
+
+def test_inspect_youtube_cookies_not_usable_without_login_info(tmp_path):
+    cookies = tmp_path / "youtube_cookies.txt"
+    cookies.write_text(
+        "# Netscape HTTP Cookie File\n"
+        ".youtube.com\tTRUE\t/\tTRUE\t1893456000\tSID\tabc\n"
+        ".youtube.com\tTRUE\t/\tTRUE\t1893456000\t__Secure-1PSID\txyz\n",
+        encoding="utf-8",
+    )
+    report = inspect_youtube_cookies(cookies)
+    assert report["has_login_info"] is False
+    assert report["usable"] is False
+    assert any("LOGIN_INFO" in i for i in report["issues"])
 
 
 def test_normalize_youtube_short_urls():

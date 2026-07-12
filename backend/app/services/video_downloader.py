@@ -160,10 +160,15 @@ def inspect_youtube_cookies(path: Path | None = None) -> dict:
         issues.append(
             "Very few youtube.com/google.com cookies — re-export while signed into youtube.com."
         )
-    if not has_login and not has_sid:
+    if not has_login:
         issues.append(
-            "Missing login cookies (LOGIN_INFO / SID / __Secure-1PSID). "
-            "Export while fully signed into YouTube, not a logged-out window."
+            "Missing LOGIN_INFO cookie — YouTube will bot-block downloads. "
+            "Export while fully signed into https://www.youtube.com (not google.com only)."
+        )
+    if not has_sid:
+        issues.append(
+            "Missing session cookies (SID / __Secure-1PSID / SAPISID). "
+            "Re-export a full youtube.com cookie dump while signed in."
         )
     if age_days >= 14:
         issues.append(
@@ -174,8 +179,13 @@ def inspect_youtube_cookies(path: Path | None = None) -> dict:
             f"Cookie file is {age_days:.0f} days old — refresh if downloads keep failing."
         )
 
-    usable = bool(yt_rows) and (has_login or has_sid) and not (
-        not has_netscape_header and not yt_rows
+    # LOGIN_INFO is required in practice for bot checks (SID alone is not enough)
+    usable = (
+        bool(yt_rows)
+        and has_login
+        and has_sid
+        and age_days < 21
+        and (has_netscape_header or bool(yt_rows))
     )
 
     return {

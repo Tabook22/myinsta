@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { cleanTranscript, reviewTranscript } from '../api/client.js'
 import { useLanguage } from '../context/LanguageContext.jsx'
 import QuoteCardModal from './QuoteCardModal.jsx'
@@ -11,7 +11,14 @@ function formatStamp(seconds) {
   return `${m}:${String(s).padStart(2, '0')}`
 }
 
-export default function TranscriptViewer({ status, transcript, video, onSeek }) {
+export default function TranscriptViewer({
+  status,
+  transcript,
+  video,
+  onSeek,
+  currentTime = 0,
+  onExplainSelection,
+}) {
   const { t } = useLanguage()
   const [copied,      setCopied]      = useState(false)
   const [selectedQuote, setSelectedQuote] = useState('')
@@ -23,6 +30,7 @@ export default function TranscriptViewer({ status, transcript, video, onSeek }) 
   const [reviewText, setReviewText] = useState(transcript?.professional_review || '')
   const [cleanupTarget, setCleanupTarget] = useState('')
   const [cleanupError, setCleanupError] = useState('')
+  const activeSegRef = useRef(null)
 
   const segments = useMemo(() => {
     const list = transcript?.segments
@@ -38,6 +46,29 @@ export default function TranscriptViewer({ status, transcript, video, onSeek }) 
   }, [transcript?.segments])
 
   const hasSegments = segments.length > 0
+
+  const activeSegmentIndex = useMemo(() => {
+    if (!hasSegments || currentTime == null) return -1
+    const tSec = Number(currentTime)
+    for (let i = 0; i < segments.length; i += 1) {
+      const seg = segments[i]
+      const start = Number(seg.start ?? 0)
+      const end = seg.end != null
+        ? Number(seg.end)
+        : (segments[i + 1] ? Number(segments[i + 1].start) : start + 8)
+      if (tSec >= start && tSec < end) return i
+    }
+    // If past last start, highlight last segment
+    if (segments.length && tSec >= Number(segments[segments.length - 1].start ?? 0)) {
+      return segments.length - 1
+    }
+    return -1
+  }, [segments, hasSegments, currentTime])
+
+  useEffect(() => {
+    if (activeSegmentIndex < 0) return
+    activeSegRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+  }, [activeSegmentIndex])
 
   useEffect(() => {
     setViewMode('original')
@@ -293,7 +324,27 @@ export default function TranscriptViewer({ status, transcript, video, onSeek }) 
       )}
 
       {selectedQuote && (
-        <p className="quote-selection-hint">{t('quoteSelectionHint')}</p>
+        <div className="selection-action-bar">
+          <p className="quote-selection-hint">{t('quoteSelectionHint')}</p>
+          <div className="selection-action-buttons">
+            {onExplainSelection && (
+              <button
+                type="button"
+                className="explain-selection-btn"
+                onClick={() => onExplainSelection(selectedQuote)}
+              >
+                {t('explainSelection')}
+              </button>
+            )}
+            <button
+              type="button"
+              className="quote-card-trigger-btn"
+              onClick={() => setShowQuoteCard(true)}
+            >
+              ✨ {t('quoteCreateCard')}
+            </button>
+          </div>
+        </div>
       )}
       {cleanupError && (
         <p className="error">{cleanupError}</p>
@@ -304,8 +355,9 @@ export default function TranscriptViewer({ status, transcript, video, onSeek }) 
           {segments.map((seg, index) => (
             <button
               key={seg.id ?? `${seg.start}-${index}`}
+              ref={index === activeSegmentIndex ? activeSegRef : null}
               type="button"
-              className="transcript-segment"
+              className={`transcript-segment${index === activeSegmentIndex ? ' transcript-segment-active' : ''}`}
               onClick={() => handleSegmentClick(seg)}
               title={t('seekToTimestamp', formatStamp(seg.start))}
             >

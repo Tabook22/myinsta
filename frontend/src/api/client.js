@@ -285,3 +285,12 @@ export function permanentDeleteVideo(videoId) {
 export function retryVideo(videoId) {
   return request(`/api/videos/${videoId}/retry`, { method: 'POST' })
 }
+
+/** Full-text library search (title, notes, transcript, tags, …) */
+export function searchLibrary(query, limit = 50) {
+  const q = (query || '').trim()
+  if (q.length < 2) {
+    return Promise.resolve({ query: q, total: 0, results: [] })
+  }
+  return request(`/api/search/library?q=${encodeURIComponent(q)}&limit=${limit}`)
+}

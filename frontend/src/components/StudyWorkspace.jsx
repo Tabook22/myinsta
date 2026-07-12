@@ -26,18 +26,29 @@ export default function StudyWorkspace({
   const { t } = useLanguage()
   const playerRef = useRef(null)
   const [tab, setTab] = useState('overview')
+  const [currentTime, setCurrentTime] = useState(0)
+  const [chatSeed, setChatSeed] = useState('')
 
   useEffect(() => {
     // Prefer transcript when ready; stay on overview while processing
     if (video.status === 'ready') setTab('transcript')
     else setTab('overview')
+    setCurrentTime(0)
+    setChatSeed('')
   }, [video.id, video.status])
 
   function seekTo(seconds) {
     playerRef.current?.seekTo(seconds)
-    // Keep player in view when seeking from transcript/chat
+    setCurrentTime(Number(seconds) || 0)
     const el = document.querySelector('.study-player-dock')
     el?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+  }
+
+  function handleExplainSelection(text) {
+    const cleaned = (text || '').trim()
+    if (!cleaned) return
+    setChatSeed(t('explainSelectionPrompt', cleaned))
+    setTab('chat')
   }
 
   const isReady = video.status === 'ready'
@@ -56,9 +67,13 @@ export default function StudyWorkspace({
         )}
       </div>
 
-      {/* Sticky player dock shared across tabs */}
       <div className="study-player-dock">
-        <VideoPlayer ref={playerRef} video={video} sticky />
+        <VideoPlayer
+          ref={playerRef}
+          video={video}
+          sticky
+          onTimeUpdate={setCurrentTime}
+        />
         <AudioPlayer video={video} />
       </div>
 
@@ -95,6 +110,8 @@ export default function StudyWorkspace({
             transcript={video.transcript}
             video={video}
             onSeek={seekTo}
+            currentTime={currentTime}
+            onExplainSelection={handleExplainSelection}
           />
         )}
 
@@ -103,6 +120,8 @@ export default function StudyWorkspace({
             video={video}
             onSeek={seekTo}
             onOpenTranscript={() => setTab('transcript')}
+            seedMessage={chatSeed}
+            onSeedConsumed={() => setChatSeed('')}
           />
         )}
 

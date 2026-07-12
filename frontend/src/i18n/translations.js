@@ -224,13 +224,18 @@ export const translations = {
     filterFavorites: 'Favorites',
     filterInstagram: 'Instagram',
     filterYoutube: 'YouTube',
-    librarySearchPlaceholder: 'Search title, creator, description, tags...',
+    librarySearchPlaceholder: 'Search title, transcript, notes, tags…',
+    searchingLibrary: 'Searching library…',
+    searchResultsCount: (n) => n === 1 ? '1 result' : `${n} results`,
     creatorFilter: 'Creator filter',
     allCreators: 'All creators',
     favoriteAdd: 'Add to favorites',
     favoriteRemove: 'Remove from favorites',
     groupSummary: (count, duration) => `${count} videos · ${duration}`,
     noTagsYet: 'No tags yet',
+    explainSelection: 'Explain selection',
+    explainSelectionPrompt: (quote) =>
+      `Explain this part of the transcript and why it matters:\n\n"${quote}"`,
 
     // ── Stats panel ───────────────────────────────────────────────────────────
     statsVideos: 'Videos',
@@ -557,13 +562,18 @@ export const translations = {
     filterFavorites: 'المفضلة',
     filterInstagram: 'إنستاجرام',
     filterYoutube: 'يوتيوب',
-    librarySearchPlaceholder: 'ابحث في العنوان أو المبدع أو الوصف أو الوسوم...',
+    librarySearchPlaceholder: 'ابحث في العنوان أو النص أو الملاحظات أو الوسوم…',
+    searchingLibrary: 'جارٍ البحث في المكتبة…',
+    searchResultsCount: (n) => n === 1 ? 'نتيجة واحدة' : `${n} نتائج`,
     creatorFilter: 'تصفية حسب المبدع',
     allCreators: 'كل المبدعين',
     favoriteAdd: 'إضافة إلى المفضلة',
     favoriteRemove: 'إزالة من المفضلة',
     groupSummary: (count, duration) => `${count} فيديو · ${duration}`,
     noTagsYet: 'لا توجد وسوم بعد',
+    explainSelection: 'اشرح التحديد',
+    explainSelectionPrompt: (quote) =>
+      `اشرح هذا الجزء من النص ولماذا هو مهم:\n\n"${quote}"`,
 
     // ── Stats panel ───────────────────────────────────────────────────────────
     statsVideos: 'مقطع فيديو',

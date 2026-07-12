@@ -32,6 +32,7 @@ from app.models.video import (
 from app.services.audio_extractor import extract_audio, extract_audio_mp3
 from app.services.video_compressor import compress_video
 from app.services.chat_service import answer_from_transcript
+from app.services.library_search import remove_video_fts, upsert_video_fts
 from app.services.pipeline_errors import friendly_pipeline_error
 from app.services.transcript_cleanup import clean_transcript_text
 from app.services.transcript_review import build_professional_review
@@ -374,6 +375,7 @@ def process_video(video_id: int) -> None:
                 ("ready", video_id),
             )
             _sync_wiki_document(conn, video_id)
+            upsert_video_fts(conn, video_id)
     except Exception as exc:
         _mark_video_failed(video_id, friendly_pipeline_error(exc))
 
@@ -509,6 +511,7 @@ def restore_video(video_id: int) -> VideoResponse:
         if not row:
             raise HTTPException(status_code=404, detail="Video not found in trash")
         conn.execute("UPDATE videos SET deleted_at = NULL WHERE id = ?", (video_id,))
+        upsert_video_fts(conn, video_id)
     return get_video(video_id)
 
 
@@ -557,6 +560,7 @@ def permanent_delete_video(video_id: int) -> None:
         ).fetchall()
         for wiki_row in wiki_rows:
             delete_wiki_file(wiki_row["file_path"])
+        remove_video_fts(conn, video_id)
         conn.execute("DELETE FROM videos WHERE id = ?", (video_id,))
     delete_library_folder(settings.library_path, storage_folder)
 
@@ -637,6 +641,7 @@ def update_video(video_id: int, payload: VideoUpdateRequest) -> VideoResponse:
 
         if updates or payload.transcript_text is not None:
             _sync_wiki_document(conn, video_id)
+            upsert_video_fts(conn, video_id)
 
     return get_video(video_id)
 
@@ -1001,6 +1006,7 @@ def delete_video(video_id: int) -> None:
         conn.execute(
             "UPDATE videos SET deleted_at = datetime('now') WHERE id = ?", (video_id,)
         )
+        remove_video_fts(conn, video_id)
 
 
 @router.get("/{video_id}/stream")

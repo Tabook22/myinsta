@@ -1,7 +1,7 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef } from 'react'
 import { getVideoStreamUrl } from '../api/client.js'
 
-const VideoPlayer = forwardRef(function VideoPlayer({ video, sticky = false }, ref) {
+const VideoPlayer = forwardRef(function VideoPlayer({ video, sticky = false, onTimeUpdate }, ref) {
   const videoRef = useRef(null)
   const streamUrl = getVideoStreamUrl(video)
 
@@ -48,6 +48,8 @@ const VideoPlayer = forwardRef(function VideoPlayer({ video, sticky = false }, r
         controls
         preload="metadata"
         src={streamUrl}
+        onTimeUpdate={(event) => onTimeUpdate?.(event.currentTarget.currentTime)}
+        onSeeked={(event) => onTimeUpdate?.(event.currentTarget.currentTime)}
       >
         Your browser does not support video playback.
       </video>

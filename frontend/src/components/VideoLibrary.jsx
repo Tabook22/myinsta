@@ -1,5 +1,5 @@
-import { useMemo, useRef, useState } from 'react'
-import { deleteVideo, getExportUrl, getVideoStreamUrl, listTrash, permanentDeleteVideo, restoreVideo, updateVideo } from '../api/client.js'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { deleteVideo, getExportUrl, getVideoStreamUrl, listTrash, permanentDeleteVideo, restoreVideo, searchLibrary, updateVideo } from '../api/client.js'
 import { useLanguage } from '../context/LanguageContext.jsx'
 
 // ── Shared helpers ────────────────────────────────────────────────────────────
@@ -168,7 +168,7 @@ function TagChips({ tags, activeTag, onTagClick, size = 'sm' }) {
 // ── Grid card ─────────────────────────────────────────────────────────────────
 function VideoCard({
   item, selected, favorite, onSelect, onView, onEdit, onDelete, onRetry, onToggleFavorite,
-  activeTag, onTagClick, t, locale,
+  activeTag, onTagClick, t, locale, snippet,
 }) {
   const [isHovering, setIsHovering] = useState(false)
   const hoverTimer  = useRef(null)
@@ -239,9 +239,11 @@ function VideoCard({
         <p className="lib-card-title" onClick={() => onView(item.id)} title={item.title}>
           {item.title || t('videoHash', item.id)}
         </p>
-        {item.description && (
+        {snippet ? (
+          <p className="lib-card-snippet">{snippet.replace(/[«»]/g, '')}</p>
+        ) : item.description ? (
           <p className="lib-card-description">{item.description}</p>
-        )}
+        ) : null}
         <TagChips tags={item.tags} activeTag={activeTag} onTagClick={onTagClick} />
         <p className="lib-card-date">{formatDate(item.created_at, locale)}</p>
       </div>
@@ -359,6 +361,9 @@ export default function VideoLibrary({
   // Transient state
   const [activeTag,      setActiveTag]      = useState(null)
   const [searchQuery,    setSearchQuery]    = useState('')
+  const [ftsIds,         setFtsIds]         = useState(null) // null = no FTS filter
+  const [ftsSnippets,    setFtsSnippets]    = useState({})
+  const [ftsSearching,   setFtsSearching]   = useState(false)
   const [quickFilter,    setQuickFilter]    = useState('all')
   const [creatorFilter,  setCreatorFilter]  = useState('all')
   const [selectedIds,    setSelectedIds]    = useState(new Set())
@@ -388,9 +393,54 @@ export default function VideoLibrary({
       .map(([name, count]) => ({ name, count }))
   }, [videos])
 
-  // Apply tag filter → sort → group
+  // Full-text search against title/notes/transcript (server FTS5)
+  useEffect(() => {
+    const query = searchQuery.trim()
+    if (query.length < 2) {
+      setFtsIds(null)
+      setFtsSnippets({})
+      setFtsSearching(false)
+      return undefined
+    }
+
+    let cancelled = false
+    const timer = window.setTimeout(async () => {
+      setFtsSearching(true)
+      try {
+        const data = await searchLibrary(query)
+        if (cancelled) return
+        const ids = data.results.map((r) => r.video_id)
+        const snippets = {}
+        data.results.forEach((r) => {
+          if (r.snippet) snippets[r.video_id] = r.snippet
+        })
+        setFtsIds(ids)
+        setFtsSnippets(snippets)
+      } catch {
+        if (!cancelled) {
+          // Fallback: client-side metadata filter only
+          setFtsIds(null)
+          setFtsSnippets({})
+        }
+      } finally {
+        if (!cancelled) setFtsSearching(false)
+      }
+    }, 280)
+
+    return () => {
+      cancelled = true
+      window.clearTimeout(timer)
+    }
+  }, [searchQuery])
+
+  // Apply tag filter → FTS → sort → group
   const filtered = useMemo(() => {
     const query = searchQuery.trim().toLowerCase()
+    const useFts = ftsIds != null && query.length >= 2
+    const ftsRank = useFts
+      ? new Map(ftsIds.map((id, index) => [id, index]))
+      : null
+
     const base = videos.filter((v) => {
       if (activeTag && !(v.tags || []).includes(activeTag)) return false
       if (creatorFilter !== 'all' && v.uploader !== creatorFilter) return false
@@ -401,11 +451,16 @@ export default function VideoLibrary({
       if (quickFilter === 'music' && v.content_type !== 'music') return false
       if (quickFilter === 'instagram' && v.platform !== 'instagram') return false
       if (quickFilter === 'youtube' && v.platform !== 'youtube') return false
+      if (useFts) return ftsRank.has(v.id)
       if (query && !searchText(v).includes(query)) return false
       return true
     })
+
+    if (useFts) {
+      return base.sort((a, b) => (ftsRank.get(a.id) ?? 999) - (ftsRank.get(b.id) ?? 999))
+    }
     return sortVideos(base, sortBy)
-  }, [videos, activeTag, creatorFilter, favoriteIds, quickFilter, searchQuery, sortBy])
+  }, [videos, activeTag, creatorFilter, favoriteIds, quickFilter, searchQuery, sortBy, ftsIds])
 
   const grouped = useMemo(() => groupByMonth(filtered, locale), [filtered, locale])
 
@@ -584,13 +639,17 @@ export default function VideoLibrary({
 
       {/* ── Tag filter bar ── */}
       <div className="library-discovery-bar">
-        <input
-          type="search"
-          className="library-search-input"
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          placeholder={t('librarySearchPlaceholder')}
-        />
+        <div className="library-search-wrap">
+          <input
+            type="search"
+            className="library-search-input"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder={t('librarySearchPlaceholder')}
+            aria-label={t('librarySearchPlaceholder')}
+          />
+          {ftsSearching && <span className="library-search-spinner" aria-hidden="true" />}
+        </div>
         <select
           className="lib-sort-select"
           value={creatorFilter}
@@ -605,6 +664,13 @@ export default function VideoLibrary({
           ))}
         </select>
       </div>
+      {searchQuery.trim().length >= 2 && (
+        <p className="library-search-meta">
+          {ftsSearching
+            ? t('searchingLibrary')
+            : t('searchResultsCount', filtered.length)}
+        </p>
+      )}
 
       <div className="quick-filter-bar">
         {['all', 'ready', 'failed', 'speech', 'music', 'instagram', 'youtube', 'favorites'].map((filter) => (
@@ -708,6 +774,7 @@ export default function VideoLibrary({
               onTagClick={(tag) => setActiveTag(activeTag === tag ? null : tag)}
               t={t}
               locale={locale}
+              snippet={ftsSnippets[item.id]}
             />
           ))}
         </div>

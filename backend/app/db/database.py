@@ -59,3 +59,7 @@ def init_db() -> None:
     with get_connection() as conn:
         conn.executescript(SCHEMA_PATH.read_text(encoding="utf-8"))
         _run_migrations(conn)
+        # Full-text index for library search (title, notes, transcript, …)
+        from app.services.library_search import rebuild_library_fts
+
+        rebuild_library_fts(conn)

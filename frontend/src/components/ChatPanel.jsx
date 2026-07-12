@@ -43,7 +43,13 @@ function MessageContent({ content, onSeek }) {
   )
 }
 
-export default function ChatPanel({ video, onSeek, onOpenTranscript }) {
+export default function ChatPanel({
+  video,
+  onSeek,
+  onOpenTranscript,
+  seedMessage = '',
+  onSeedConsumed,
+}) {
   const { t } = useLanguage()
   const [message, setMessage]               = useState('')
   const [messages, setMessages]             = useState([])
@@ -53,6 +59,7 @@ export default function ChatPanel({ video, onSeek, onOpenTranscript }) {
   const [mode, setMode]                     = useState(() => defaultMode(video))
   const [answerLanguage, setAnswerLanguage] = useState('english')
   const messagesEndRef = useRef(null)
+  const inputRef = useRef(null)
 
   const isReady     = video.status === 'ready'
   const hasTranscript = Boolean(video.transcript?.full_text?.trim())
@@ -102,6 +109,15 @@ export default function ChatPanel({ video, onSeek, onOpenTranscript }) {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
+
+  // Pre-fill from transcript "Explain selection"
+  useEffect(() => {
+    if (!seedMessage) return
+    setMessage(seedMessage)
+    setMode('transcript')
+    onSeedConsumed?.()
+    window.setTimeout(() => inputRef.current?.focus(), 50)
+  }, [seedMessage, onSeedConsumed])
 
   async function sendMessage(text) {
     const outgoing = (text || '').trim()
@@ -252,6 +268,7 @@ export default function ChatPanel({ video, onSeek, onOpenTranscript }) {
 
       <form className="url-form chat-form" onSubmit={handleSubmit}>
         <input
+          ref={inputRef}
           value={message}
           onChange={(e) => setMessage(e.target.value)}
           onKeyDown={(e) => {

@@ -3881,3 +3881,83 @@ kbd {
   .video-player-sticky .video-player { max-height: 38vh; }
   .transcript-segment { grid-template-columns: 44px minmax(0, 1fr); padding: 8px 10px; }
 }
+
+/* -- Library FTS search -- */
+.library-search-wrap {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+}
+.library-search-wrap .library-search-input {
+  width: 100%;
+}
+.library-search-spinner {
+  position: absolute;
+  inset-inline-end: 12px;
+  top: 50%;
+  width: 14px;
+  height: 14px;
+  margin-top: -7px;
+  border: 2px solid #c7d2fe;
+  border-top-color: #4f46e5;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+.library-search-meta {
+  margin: 0 0 10px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted, #64748b);
+}
+.lib-card-snippet {
+  margin: 4px 0 0;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--muted, #64748b);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* -- Active transcript segment + explain selection -- */
+.transcript-segment-active {
+  border-color: color-mix(in srgb, var(--accent, #4f46e5) 55%, var(--border, #e2e8f0)) !important;
+  background: var(--accent-soft, #eef2ff) !important;
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent, #4f46e5) 25%, transparent);
+}
+.transcript-segment-active .transcript-segment-time {
+  color: var(--accent-hover, #4338ca);
+}
+.selection-action-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid color-mix(in srgb, var(--accent, #4f46e5) 25%, var(--border, #e2e8f0));
+  background: var(--accent-soft, #eef2ff);
+}
+.selection-action-bar .quote-selection-hint {
+  margin: 0;
+}
+.selection-action-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.explain-selection-btn {
+  padding: 7px 12px;
+  font-size: 12px;
+  font-weight: 700;
+  border-radius: 999px;
+  background: var(--accent, #4f46e5);
+  color: #fff;
+  box-shadow: none;
+}
+.explain-selection-btn:hover:not(:disabled) {
+  background: var(--accent-hover, #4338ca);
+}

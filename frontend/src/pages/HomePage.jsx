@@ -4,14 +4,11 @@ import { createVideo, getVideo, listVideosPaginated, retryVideo } from '../api/c
 import { useLanguage } from '../context/LanguageContext.jsx'
 import { useTheme } from '../context/ThemeContext.jsx'
 import { useToast } from '../context/ToastContext.jsx'
-import ChatPanel from '../components/ChatPanel.jsx'
 import OnboardingModal, { shouldShowOnboarding, markOnboardingDone } from '../components/OnboardingModal.jsx'
 import ShortcutsModal from '../components/ShortcutsModal.jsx'
 import StatsPanel from '../components/StatsPanel.jsx'
-import TranscriptViewer from '../components/TranscriptViewer.jsx'
+import StudyWorkspace from '../components/StudyWorkspace.jsx'
 import UrlSubmitForm from '../components/UrlSubmitForm.jsx'
-import VideoDetails from '../components/VideoDetails.jsx'
-import VideoEditor from '../components/VideoEditor.jsx'
 import VideoLibrary from '../components/VideoLibrary.jsx'
 
 // ── Notification helper ──────────────────────────────────────────────────────
@@ -407,32 +404,16 @@ export default function HomePage() {
       )}
 
       {video ? (
-        <section className="grid" ref={detailRef}>
-          <div className="card">
-            <VideoDetails
-              video={video}
-              allVideos={recentVideos}
-              onVideoUpdated={handleVideoUpdated}
-            />
-            <TranscriptViewer status={video.status} transcript={video.transcript} video={video} />
-            {showEditor ? (
-              <VideoEditor
-                video={video}
-                onUpdated={handleVideoUpdated}
-                onDeleted={handleVideoDeleted}
-              />
-            ) : (
-              <div className="detail-actions">
-                <button type="button" className="btn-secondary" onClick={() => setShowEditor(true)}>
-                  {t('editThisVideo')}
-                </button>
-              </div>
-            )}
-          </div>
-          <div className="card">
-            <ChatPanel video={video} />
-          </div>
-        </section>
+        <div ref={detailRef}>
+          <StudyWorkspace
+            video={video}
+            allVideos={recentVideos}
+            showEditor={showEditor}
+            onShowEditor={() => setShowEditor(true)}
+            onVideoUpdated={handleVideoUpdated}
+            onVideoDeleted={handleVideoDeleted}
+          />
+        </div>
       ) : null}
     </main>
   )

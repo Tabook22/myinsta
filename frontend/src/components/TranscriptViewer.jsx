@@ -1,22 +1,47 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { cleanTranscript, reviewTranscript } from '../api/client.js'
 import { useLanguage } from '../context/LanguageContext.jsx'
 import QuoteCardModal from './QuoteCardModal.jsx'
 
-export default function TranscriptViewer({ status, transcript, video }) {
+function formatStamp(seconds) {
+  if (seconds == null || Number.isNaN(Number(seconds))) return ''
+  const total = Math.max(0, Math.floor(Number(seconds)))
+  const m = Math.floor(total / 60)
+  const s = total % 60
+  return `${m}:${String(s).padStart(2, '0')}`
+}
+
+export default function TranscriptViewer({ status, transcript, video, onSeek }) {
   const { t } = useLanguage()
   const [copied,      setCopied]      = useState(false)
   const [selectedQuote, setSelectedQuote] = useState('')
   const [showQuoteCard, setShowQuoteCard] = useState(false)
   const [viewMode, setViewMode] = useState('original')
+  const [layoutMode, setLayoutMode] = useState('segments') // segments | prose
   const [cleanedText, setCleanedText] = useState(transcript?.cleaned_text || '')
   const [arabicText, setArabicText] = useState(transcript?.cleaned_translation_ar || transcript?.translation_ar || '')
   const [reviewText, setReviewText] = useState(transcript?.professional_review || '')
   const [cleanupTarget, setCleanupTarget] = useState('')
   const [cleanupError, setCleanupError] = useState('')
 
+  const segments = useMemo(() => {
+    const list = transcript?.segments
+    if (!Array.isArray(list)) return []
+    return list
+      .map((seg) => ({
+        id: seg.id,
+        start: seg.start,
+        end: seg.end,
+        text: (seg.text || '').trim(),
+      }))
+      .filter((seg) => seg.text)
+  }, [transcript?.segments])
+
+  const hasSegments = segments.length > 0
+
   useEffect(() => {
     setViewMode('original')
+    setLayoutMode(hasSegments ? 'segments' : 'prose')
     setCleanedText(transcript?.cleaned_text || '')
     setArabicText(transcript?.cleaned_translation_ar || transcript?.translation_ar || '')
     setReviewText(transcript?.professional_review || '')
@@ -29,6 +54,7 @@ export default function TranscriptViewer({ status, transcript, video }) {
     transcript?.cleaned_text,
     transcript?.cleaned_translation_ar,
     transcript?.professional_review,
+    hasSegments,
   ])
 
   const displayText = viewMode === 'review'
@@ -42,6 +68,7 @@ export default function TranscriptViewer({ status, transcript, video }) {
   const isCleaningEnglish = cleanupTarget === 'en'
   const isCleaningArabic = cleanupTarget === 'ar'
   const isReviewing = cleanupTarget === 'review'
+  const showSegments = layoutMode === 'segments' && hasSegments && viewMode === 'original'
 
   async function handleCopy() {
     if (!displayText) return
@@ -67,6 +94,7 @@ export default function TranscriptViewer({ status, transcript, video }) {
     setCleanupError('')
     if (cleanedText) {
       setViewMode('cleaned')
+      setLayoutMode('prose')
       return
     }
 
@@ -75,6 +103,7 @@ export default function TranscriptViewer({ status, transcript, video }) {
       const result = await cleanTranscript(video.id, 'en')
       setCleanedText(result.cleaned_text)
       setViewMode('cleaned')
+      setLayoutMode('prose')
     } catch (err) {
       setCleanupError(err.message)
     } finally {
@@ -87,6 +116,7 @@ export default function TranscriptViewer({ status, transcript, video }) {
     setCleanupError('')
     if (arabicText && transcript?.cleaned_translation_ar) {
       setViewMode('arabic')
+      setLayoutMode('prose')
       return
     }
 
@@ -95,6 +125,7 @@ export default function TranscriptViewer({ status, transcript, video }) {
       const result = await cleanTranscript(video.id, 'ar')
       setArabicText(result.cleaned_text)
       setViewMode('arabic')
+      setLayoutMode('prose')
     } catch (err) {
       setCleanupError(err.message)
     } finally {
@@ -107,6 +138,7 @@ export default function TranscriptViewer({ status, transcript, video }) {
     setCleanupError('')
     if (reviewText) {
       setViewMode('review')
+      setLayoutMode('prose')
       return
     }
 
@@ -115,6 +147,7 @@ export default function TranscriptViewer({ status, transcript, video }) {
       const result = await reviewTranscript(video.id)
       setReviewText(result.review_text)
       setViewMode('review')
+      setLayoutMode('prose')
     } catch (err) {
       setCleanupError(err.message)
     } finally {
@@ -130,6 +163,11 @@ export default function TranscriptViewer({ status, transcript, video }) {
     else setSelectedQuote('')
   }, [])
 
+  function handleSegmentClick(seg) {
+    if (seg.start == null) return
+    onSeek?.(seg.start)
+  }
+
   if (status === 'processing' || status === 'queued') {
     return (
       <section>
@@ -142,7 +180,7 @@ export default function TranscriptViewer({ status, transcript, video }) {
   if (status === 'failed') return null
 
   return (
-    <section>
+    <section className="transcript-section">
       <div className="transcript-header">
         <h3>{t('transcript')}</h3>
         <div className="transcript-header-actions">
@@ -159,7 +197,10 @@ export default function TranscriptViewer({ status, transcript, video }) {
                 type="button"
                 className={viewMode === 'original' ? 'transcript-mode-active' : ''}
                 disabled={Boolean(cleanupTarget)}
-                onClick={() => setViewMode('original')}
+                onClick={() => {
+                  setViewMode('original')
+                  if (hasSegments) setLayoutMode('segments')
+                }}
               >
                 {t('originalTranscript')}
               </button>
@@ -228,6 +269,29 @@ export default function TranscriptViewer({ status, transcript, video }) {
         </div>
       </div>
 
+      {hasSegments && viewMode === 'original' && (
+        <div className="transcript-layout-toggle" role="group" aria-label={t('transcriptLayout')}>
+          <button
+            type="button"
+            className={layoutMode === 'segments' ? 'transcript-mode-active' : ''}
+            onClick={() => setLayoutMode('segments')}
+          >
+            {t('layoutSegments')}
+          </button>
+          <button
+            type="button"
+            className={layoutMode === 'prose' ? 'transcript-mode-active' : ''}
+            onClick={() => setLayoutMode('prose')}
+          >
+            {t('layoutProse')}
+          </button>
+        </div>
+      )}
+
+      {showSegments && (
+        <p className="transcript-seek-hint">{t('transcriptSeekHint')}</p>
+      )}
+
       {selectedQuote && (
         <p className="quote-selection-hint">{t('quoteSelectionHint')}</p>
       )}
@@ -235,7 +299,22 @@ export default function TranscriptViewer({ status, transcript, video }) {
         <p className="error">{cleanupError}</p>
       )}
 
-      {displayText ? (
+      {showSegments ? (
+        <div className="transcript-segments" onMouseUp={handleTextSelect} onTouchEnd={handleTextSelect}>
+          {segments.map((seg, index) => (
+            <button
+              key={seg.id ?? `${seg.start}-${index}`}
+              type="button"
+              className="transcript-segment"
+              onClick={() => handleSegmentClick(seg)}
+              title={t('seekToTimestamp', formatStamp(seg.start))}
+            >
+              <span className="transcript-segment-time">{formatStamp(seg.start)}</span>
+              <span className="transcript-segment-text">{seg.text}</span>
+            </button>
+          ))}
+        </div>
+      ) : displayText ? (
         <p
           className="transcript"
           dir={viewMode === 'arabic' ? 'rtl' : undefined}

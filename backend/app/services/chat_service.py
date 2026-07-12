@@ -76,14 +76,32 @@ def answer_from_transcript(question: str, full_text: str, segments: list[dict] |
 
     if scored:
         ranked = sorted(scored, key=lambda item: item[0], reverse=True)[:3]
-        lines = ["Based on the transcript, here are the most relevant parts:\n"]
+        lines = [
+            "Based on the transcript, here are the most relevant parts.",
+            "Click a timestamp in the app to jump to that moment in the video.\n",
+        ]
         for _, chunk in ranked:
             stamp = _format_timestamp(chunk.get("start"))
-            prefix = f"{stamp} " if stamp else "- "
-            lines.append(f"{prefix}{chunk['text']}")
+            if stamp:
+                lines.append(f"{stamp} {chunk['text']}")
+            else:
+                lines.append(f"- {chunk['text']}")
         return "\n".join(lines)
 
     if _is_generic_question(question):
+        # Prefer opening chunks with timestamps when available
+        if chunks and chunks[0].get("start") is not None:
+            lines = [
+                "Based on the transcript, here is what this video covers:\n",
+            ]
+            for chunk in chunks[:5]:
+                stamp = _format_timestamp(chunk.get("start"))
+                text = chunk["text"]
+                if len(text) > 220:
+                    text = f"{text[:220].rstrip()}..."
+                lines.append(f"{stamp} {text}" if stamp else f"- {text}")
+            return "\n".join(lines)
+
         preview = cleaned if len(cleaned) <= 900 else f"{cleaned[:900].rstrip()}..."
         return (
             "Based on the transcript, here is what this video covers:\n\n"
@@ -92,6 +110,6 @@ def answer_from_transcript(question: str, full_text: str, segments: list[dict] |
 
     preview = cleaned if len(cleaned) <= 500 else f"{cleaned[:500].rstrip()}..."
     return (
-        "I could not find a exact match for that question, but here is the transcript excerpt:\n\n"
+        "I could not find an exact match for that question, but here is a transcript excerpt:\n\n"
         f"{preview}"
     )

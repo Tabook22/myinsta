@@ -74,7 +74,15 @@ function CreatorCard({ video, allVideos }) {
 }
 
 // ── Main component ────────────────────────────────────────────────────────────
-export default function VideoDetails({ video, allVideos = [], onRetry, onVideoUpdated }) {
+export default function VideoDetails({
+  video,
+  allVideos = [],
+  onRetry,
+  onVideoUpdated,
+  hidePlayer = false,
+  hideNotes = false,
+  compact = false,
+}) {
   const { t } = useLanguage()
   const duration = formatDuration(video.duration_seconds)
   const [descriptionMode, setDescriptionMode] = useState('original')
@@ -128,16 +136,20 @@ export default function VideoDetails({ video, allVideos = [], onRetry, onVideoUp
   }
 
   return (
-    <section>
-      <VideoPlayer video={video} />
-      <AudioPlayer video={video} />
+    <section className={compact ? 'video-details-compact' : undefined}>
+      {!hidePlayer && (
+        <>
+          <VideoPlayer video={video} />
+          <AudioPlayer video={video} />
+        </>
+      )}
 
       {!video.video_url && video.thumbnail_url ? (
         <img className="thumbnail" src={video.thumbnail_url}
           alt={video.title || t('untitledVideo')} />
       ) : null}
 
-      <h2>{video.title || t('untitledVideo')}</h2>
+      {!compact && <h2>{video.title || t('untitledVideo')}</h2>}
 
       {/* Status + duration inline */}
       <div className="video-meta-row">
@@ -156,10 +168,10 @@ export default function VideoDetails({ video, allVideos = [], onRetry, onVideoUp
       {/* Creator card */}
       <CreatorCard video={video} allVideos={allVideos} />
 
-      {video.storage_stamp ? (
+      {!compact && video.storage_stamp ? (
         <p><strong>{t('labelSavedAs')}</strong> {video.storage_stamp}</p>
       ) : null}
-      {video.storage_folder ? (
+      {!compact && video.storage_folder ? (
         <p><strong>{t('labelFolder')}</strong> {video.storage_folder}</p>
       ) : null}
 
@@ -224,11 +236,11 @@ export default function VideoDetails({ video, allVideos = [], onRetry, onVideoUp
         <p className="error">{video.error_message}</p>
       ) : null}
 
-      {/* Notion export */}
+      {/* Notion export + wiki stay on overview */}
       {video.status === 'ready' && <NotionExport video={video} />}
       <WikiDocuments video={video} />
 
-      <NotesEditor video={video} />
+      {!hideNotes && <NotesEditor video={video} />}
     </section>
   )
 }

@@ -3604,3 +3604,280 @@ kbd {
   .trash-item { flex-wrap: wrap; gap: 8px; }
   .trash-item-actions { width: 100%; justify-content: flex-end; }
 }
+
+/* -----------------------------------------------------------
+   STUDY WORKSPACE
+----------------------------------------------------------- */
+.study-workspace {
+  margin-top: 20px;
+  padding: 18px 18px 22px;
+}
+
+.study-workspace-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.study-kicker {
+  margin: 0 0 4px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--accent-text, #3730a3);
+}
+
+.study-title {
+  margin: 0;
+  font-size: clamp(1.15rem, 2.5vw, 1.45rem);
+  letter-spacing: -0.02em;
+  line-height: 1.25;
+}
+
+.study-player-dock {
+  position: sticky;
+  top: 8px;
+  z-index: 5;
+  margin-bottom: 14px;
+  padding: 10px;
+  border-radius: 14px;
+  border: 1px solid var(--border, #e2e8f0);
+  background: color-mix(in srgb, var(--surface, #fff) 92%, transparent);
+  backdrop-filter: blur(8px);
+  box-shadow: var(--shadow-sm, 0 4px 16px rgb(15 23 42 / 6%));
+}
+
+.video-player-sticky .video-player {
+  max-height: min(42vh, 360px);
+  width: 100%;
+  border-radius: 10px;
+  background: #0f172a;
+}
+
+.study-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 16px;
+  padding: 4px;
+  border-radius: 12px;
+  background: var(--surface-2, #f8fafc);
+  border: 1px solid var(--border, #e2e8f0);
+}
+
+.study-tab {
+  flex: 1 1 auto;
+  min-width: 88px;
+  padding: 9px 12px;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--muted, #64748b);
+  font-size: 13px;
+  font-weight: 600;
+  box-shadow: none;
+}
+
+.study-tab:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--accent, #4f46e5) 10%, transparent);
+  color: var(--accent, #4f46e5);
+}
+
+.study-tab-active {
+  background: var(--surface, #fff) !important;
+  color: var(--accent, #4f46e5) !important;
+  box-shadow: 0 1px 3px rgb(15 23 42 / 8%);
+}
+
+.study-tab-panel {
+  min-height: 180px;
+}
+
+.study-locked-note {
+  margin: 12px 0;
+  color: var(--muted, #64748b);
+}
+
+.video-details-compact h2 {
+  display: none;
+}
+
+/* Timed transcript segments */
+.transcript-layout-toggle {
+  display: inline-flex;
+  margin: 0 0 10px;
+  border: 1px solid var(--border, #e2e8f0);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.transcript-layout-toggle button {
+  padding: 5px 10px;
+  min-height: unset;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--muted, #64748b);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.transcript-layout-toggle button + button {
+  border-inline-start: 1px solid var(--border, #e2e8f0);
+}
+
+.transcript-layout-toggle .transcript-mode-active {
+  background: var(--accent-soft, #e0e7ff);
+  color: var(--accent, #4338ca);
+}
+
+.transcript-seek-hint {
+  margin: 0 0 10px;
+  font-size: 12px;
+  color: var(--muted, #64748b);
+}
+
+.transcript-segments {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-width: 70ch;
+}
+
+.transcript-segment {
+  display: grid;
+  grid-template-columns: 52px minmax(0, 1fr);
+  gap: 10px;
+  align-items: start;
+  width: 100%;
+  text-align: start;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid transparent;
+  background: var(--surface-2, #f8fafc);
+  color: var(--text, #0f172a);
+  font-weight: 400;
+  box-shadow: none;
+  line-height: 1.55;
+  transition: border-color 0.15s, background 0.15s, transform 0.12s;
+}
+
+.transcript-segment:hover {
+  border-color: color-mix(in srgb, var(--accent, #4f46e5) 35%, var(--border, #e2e8f0));
+  background: var(--accent-soft, #eef2ff);
+  transform: translateY(-1px);
+}
+
+.transcript-segment-time {
+  font-size: 12px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--accent, #4f46e5);
+  padding-top: 2px;
+}
+
+.transcript-segment-text {
+  font-size: 0.98rem;
+}
+
+/* Chat suggestions + timestamps */
+.chat-empty-state {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.chat-suggestions-label {
+  margin: 0 0 8px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--muted, #64748b);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.chat-suggestion-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.chat-suggestion-chip {
+  padding: 8px 12px;
+  border-radius: 999px;
+  background: var(--surface, #fff);
+  color: var(--text, #0f172a);
+  border: 1px solid var(--border, #e2e8f0);
+  font-size: 13px;
+  font-weight: 600;
+  box-shadow: none;
+  text-align: start;
+}
+
+.chat-suggestion-chip:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--accent, #4f46e5) 40%, var(--border, #e2e8f0));
+  background: var(--accent-soft, #eef2ff);
+  color: var(--accent, #4f46e5);
+}
+
+.chat-open-transcript-link {
+  margin-top: 10px;
+  padding: 0;
+  background: transparent;
+  color: var(--accent, #4f46e5);
+  font-size: 13px;
+  font-weight: 600;
+  box-shadow: none;
+}
+
+.chat-open-transcript-link:hover {
+  background: transparent;
+  text-decoration: underline;
+}
+
+.chat-message-body {
+  margin: 6px 0 0;
+  white-space: pre-wrap;
+  line-height: 1.55;
+}
+
+.chat-timestamp-btn {
+  display: inline;
+  padding: 0 3px;
+  margin: 0 1px;
+  border-radius: 4px;
+  background: var(--accent-soft, #eef2ff);
+  color: var(--accent, #4f46e5);
+  font-weight: 700;
+  font-size: inherit;
+  font-variant-numeric: tabular-nums;
+  box-shadow: none;
+  vertical-align: baseline;
+}
+
+.chat-timestamp-btn:hover {
+  background: color-mix(in srgb, var(--accent, #4f46e5) 18%, transparent);
+}
+
+[data-theme="dark"] .study-player-dock {
+  background: color-mix(in srgb, var(--surface, #111827) 94%, transparent);
+}
+
+[data-theme="dark"] .transcript-segment {
+  background: #1e293b;
+}
+
+[data-theme="dark"] .chat-suggestion-chip {
+  background: #1e293b;
+}
+
+@media (max-width: 720px) {
+  .study-workspace { padding: 14px; }
+  .study-tabs { gap: 4px; }
+  .study-tab { min-width: 72px; padding: 8px 10px; font-size: 12px; }
+  .study-player-dock { top: 0; padding: 8px; }
+  .video-player-sticky .video-player { max-height: 38vh; }
+  .transcript-segment { grid-template-columns: 44px minmax(0, 1fr); padding: 8px 10px; }
+}

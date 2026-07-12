@@ -5,7 +5,10 @@ from pydantic import BaseModel, Field, HttpUrl
 
 VideoStatus = Literal["queued", "processing", "ready", "failed"]
 ContentType = Literal["speech", "music", "unknown"]
-ChatMode = Literal["transcript", "web"]
+# transcript = local transcript only
+# hybrid    = transcript + web (preferred "with internet" mode)
+# web       = web-focused (legacy alias; still accepted)
+ChatMode = Literal["transcript", "hybrid", "web"]
 ChatAnswerLanguage = Literal["english", "arabic", "bilingual"]
 
 

@@ -31,7 +31,7 @@ from app.models.video import (
 )
 from app.services.audio_extractor import extract_audio, extract_audio_mp3
 from app.services.video_compressor import compress_video
-from app.services.chat_service import answer_from_transcript
+from app.services.chat_service import answer_from_transcript, answer_hybrid
 from app.services.library_search import remove_video_fts, upsert_video_fts
 from app.services.pipeline_errors import friendly_pipeline_error
 from app.services.transcript_cleanup import clean_transcript_text
@@ -1226,15 +1226,32 @@ def chat_with_video(video_id: int, payload: ChatRequest) -> ChatResponse:
             if transcript_row["segments_json"]:
                 segments = json.loads(transcript_row["segments_json"])
 
-        if payload.mode == "web":
-            answer = search_web(
+        title = video_row["title"] if video_row else None
+        uploader = video_row["uploader"] if video_row else None
+        mode = (payload.mode or "transcript").strip().lower()
+
+        if mode == "transcript":
+            # Local transcript only
+            answer = answer_from_transcript(message, full_text, segments)
+        elif mode in {"hybrid", "both", "transcript_web"}:
+            # Transcript + internet together
+            answer = answer_hybrid(
                 message,
-                title=video_row["title"] if video_row else None,
-                uploader=video_row["uploader"] if video_row else None,
-                transcript_text=full_text or None,
+                full_text,
+                segments,
+                title=title,
+                uploader=uploader,
+                web_search_fn=search_web,
             )
         else:
-            answer = answer_from_transcript(message, full_text, segments)
+            # Legacy "web" mode: web search (still passes transcript for song ID)
+            answer = search_web(
+                message,
+                title=title,
+                uploader=uploader,
+                transcript_text=full_text or None,
+                use_transcript_context=False,
+            )
 
         answer = _format_chat_answer_language(answer, payload.answer_language)
 

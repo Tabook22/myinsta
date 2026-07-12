@@ -3,7 +3,8 @@ import { chatWithVideo, getChatHistory } from '../api/client.js'
 import { useLanguage } from '../context/LanguageContext.jsx'
 
 function defaultMode(video) {
-  return video.content_type === 'music' ? 'web' : 'transcript'
+  // Music often needs outside context; speech defaults to transcript-only
+  return video.content_type === 'music' ? 'hybrid' : 'transcript'
 }
 
 function parseTimestampToSeconds(stamp) {
@@ -67,11 +68,15 @@ export default function ChatPanel({
 
   const suggestedPrompts = useMemo(() => {
     if (!isReady) return []
-    if (mode === 'web') {
+    if (mode === 'hybrid') {
+      if (isMusic || !hasTranscript) {
+        return [t('promptMusicFallback'), t('promptWebContext'), t('promptWebLearnMore')]
+      }
       return [
-        t('promptWebOverview'),
+        t('promptSummary'),
+        t('promptKeyPoints'),
         t('promptWebContext'),
-        t('promptWebLearnMore'),
+        t('promptArabicIdea'),
       ]
     }
     if (isMusic || !hasTranscript) {
@@ -152,7 +157,7 @@ export default function ChatPanel({
       <div className="chat-panel-header">
         <h3>{t('chatWithVideo')}</h3>
 
-        <div className="chat-mode-toggle" role="group" aria-label={t('chatWithVideo')}>
+        <div className="chat-mode-toggle" role="group" aria-label={t('chatSourceLabel')}>
           <button type="button"
             className={`chat-mode-btn ${mode === 'transcript' ? 'chat-mode-btn-active' : ''}`}
             onClick={() => setMode('transcript')}
@@ -161,11 +166,11 @@ export default function ChatPanel({
             {t('modeTranscript')}
           </button>
           <button type="button"
-            className={`chat-mode-btn ${mode === 'web' ? 'chat-mode-btn-active' : ''}`}
-            onClick={() => setMode('web')}
-            title={t('titleWeb')}
+            className={`chat-mode-btn ${mode === 'hybrid' ? 'chat-mode-btn-active' : ''}`}
+            onClick={() => setMode('hybrid')}
+            title={t('titleHybrid')}
             disabled={!isReady}>
-            {t('modeWeb')}
+            {t('modeHybrid')}
           </button>
         </div>
       </div>
@@ -202,8 +207,8 @@ export default function ChatPanel({
           {isMusic && mode === 'transcript' && (
             <span className="notice-warning">
               {t('noticeMusicWarning')}
-              <button type="button" className="notice-link" onClick={() => setMode('web')}>
-                {t('switchToWeb')}
+              <button type="button" className="notice-link" onClick={() => setMode('hybrid')}>
+                {t('switchToHybrid')}
               </button>
             </span>
           )}
@@ -213,8 +218,8 @@ export default function ChatPanel({
           {!isMusic && mode === 'transcript' && !hasTranscript && (
             <span className="notice-warning">{t('noticeNoTranscript')}</span>
           )}
-          {mode === 'web' && (
-            <span className="notice-info">{t('noticeWebMode')}</span>
+          {mode === 'hybrid' && (
+            <span className="notice-info">{t('noticeHybridMode')}</span>
           )}
         </p>
       )}
@@ -225,7 +230,7 @@ export default function ChatPanel({
           <div className="chat-empty-state">
             <p className="chat-placeholder">
               {isReady
-                ? mode === 'web' ? t('chatPlaceholderWeb') : t('chatPlaceholderTranscript')
+                ? mode === 'hybrid' ? t('chatPlaceholderHybrid') : t('chatPlaceholderTranscript')
                 : t('chatLocked')}
             </p>
             {isReady && suggestedPrompts.length > 0 && (
@@ -279,7 +284,7 @@ export default function ChatPanel({
           }}
           placeholder={
             isReady
-              ? mode === 'web' ? t('inputPlaceholderWeb') : t('inputPlaceholderTranscript')
+              ? mode === 'hybrid' ? t('inputPlaceholderHybrid') : t('inputPlaceholderTranscript')
               : t('inputPlaceholderLocked')
           }
           disabled={!isReady || isSending}

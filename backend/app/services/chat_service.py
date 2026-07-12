@@ -113,3 +113,40 @@ def answer_from_transcript(question: str, full_text: str, segments: list[dict] |
         "I could not find an exact match for that question, but here is a transcript excerpt:\n\n"
         f"{preview}"
     )
+
+
+def answer_hybrid(
+    question: str,
+    full_text: str,
+    segments: list[dict] | None,
+    *,
+    title: str | None = None,
+    uploader: str | None = None,
+    web_search_fn=None,
+) -> str:
+    """
+    Combine transcript-grounded retrieval with a web search answer.
+
+    web_search_fn is injected to avoid circular imports (pass search_web).
+    """
+    transcript_part = answer_from_transcript(question, full_text, segments)
+
+    if web_search_fn is None:
+        web_part = "Web search is unavailable."
+    else:
+        web_part = web_search_fn(
+            question,
+            title=title,
+            uploader=uploader,
+            transcript_text=(full_text or None),
+            use_transcript_context=True,
+        )
+
+    return (
+        "📜 From the transcript\n"
+        "────────────────────\n"
+        f"{transcript_part}\n\n"
+        "🌐 From the web\n"
+        "────────────────────\n"
+        f"{web_part}"
+    )

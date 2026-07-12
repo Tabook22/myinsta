@@ -205,6 +205,7 @@ def search_web(
     title: str | None = None,
     uploader: str | None = None,
     transcript_text: str | None = None,
+    use_transcript_context: bool = False,
 ) -> str:
     """
     Search the web and return a human-readable answer string.
@@ -213,6 +214,7 @@ def search_web(
     Query strategy:
     - Song questions   → use transcript lyrics as search term
     - Creator questions → include uploader name
+    - Hybrid mode (use_transcript_context) → blend title/transcript keywords with the question
     - General questions → use the question directly (no social media bias)
     """
     is_song_q    = _is_song_question(question)
@@ -231,6 +233,19 @@ def search_web(
     elif is_creator_q and uploader:
         # User is asking about the creator → include their name
         queries = [f"{uploader} {question}", question]
+    elif use_transcript_context and (title or transcript_text):
+        # Hybrid chat: ground web search in the video topic
+        topic_bits = [p for p in [title, uploader] if p]
+        if transcript_text:
+            words = re.findall(r"[A-Za-z\u0600-\u06FF0-9']+", transcript_text)
+            # Keep a short topical snippet from the transcript
+            topic_bits.append(" ".join(words[:18]))
+        topic = " ".join(topic_bits).strip()
+        queries = [
+            f"{question} {topic}".strip(),
+            question,
+            topic if topic else question,
+        ]
     else:
         # General web question → just use what the user typed, no social media bias
         queries = [question]

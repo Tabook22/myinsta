@@ -105,6 +105,23 @@ Hermes may edit code or docs directly when the user explicitly asks, or when upd
   channels, and bulk ingestion should wait until chunking/retrieval and stronger
   background processing exist.
 
+## YouTube on production VPS (proven — keep this)
+
+Working setup as of 2026-07-13:
+
+- Code: `/opt/myinsta`, service `myinsta.service`, API **`127.0.0.1:8010`**
+- Cookies: `/home/nasser/.config/myinsta/youtube_cookies.txt`
+- Cookies **must** include `LOGIN_INFO` (verify with `grep -c LOGIN_INFO ...` ≥ 1)
+- Prefer small YouTube-only export (~3KB); large ~190KB dumps often lack LOGIN_INFO or are stale
+- After scp, check **file size matches PC** before debugging the app
+- Node **>= 22**, packages `yt-dlp[default]` + `yt-dlp-ejs`, FFmpeg on PATH
+- Downloader uses CLI: `python -m yt_dlp --js-runtimes node --remote-components ejs:github --cookies ...`
+- Incomplete cookies (no LOGIN_INFO) are skipped deliberately
+- Diagnose: `curl -sS http://127.0.0.1:8010/health/youtube`
+- Full runbook: `backend/README.md` → “YouTube downloads (proven VPS runbook)”
+
+When YouTube fails again: re-export cookies with LOGIN_INFO → scp → CLI test → restart service. Do not change ports/clients blindly.
+
 ## Expected commands
 
 Backend setup and run:

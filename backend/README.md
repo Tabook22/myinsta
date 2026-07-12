@@ -25,83 +25,121 @@ uv pip install --no-build-isolation -r requirements.txt
 
 Open http://localhost:8000/docs after starting the server.
 
-## YouTube downloads (reliability)
+## YouTube downloads (proven VPS runbook — Jul 2026)
 
-YouTube actively blocks bots. Most MyInsta YouTube failures are fixed by:
+**Status:** Working on production VPS when the checklist below is satisfied.
 
-1. **Fresh cookies** (signed-in browser)
-2. **Latest `yt-dlp[default]`**
-3. **Node.js** on PATH (signature / EJS challenges)
-4. **FFmpeg** on PATH (merge video+audio when needed)
+### What actually works (do not invent a different path)
 
-### Cookies on a VPS (recommended)
+| Piece | Working value |
+|--------|----------------|
+| App path | `/opt/myinsta` |
+| API (systemd) | `127.0.0.1:**8010**` (not 8000) |
+| Unit file | `/etc/systemd/system/myinsta.service` |
+| Cookies path | `/home/nasser/.config/myinsta/youtube_cookies.txt` |
+| Cookies shape | Small YouTube-only Netscape file (~3 KB) with **`LOGIN_INFO`** |
+| Node | **v22+** (`node -v`) — required for yt-dlp EJS |
+| Packages | `yt-dlp[default]` + `yt-dlp-ejs` |
+| CLI that must succeed | see below |
 
-**Important:** A large cookies file is not enough. It must be a **fresh Netscape**
-export from a browser **signed into youtube.com**, including `LOGIN_INFO` and/or
-`SID` / `__Secure-1PSID`. Stale cookies often make the bot check *worse*.
-
-1. On your PC, open Chrome/Firefox while signed into **https://www.youtube.com**.
-2. Play any video (so the session is warm).
-3. Install extension **Get cookies.txt LOCALLY**.
-4. Export cookies for the current site → `youtube_cookies.txt`.
-5. Copy to the server:
+App download path: `video_downloader.py` shells out to:
 
 ```bash
-mkdir -p /home/nasser/.config/myinsta
-# from your PC (example):
-# scp youtube_cookies.txt nasser@YOUR_VPS:/home/nasser/.config/myinsta/youtube_cookies.txt
-chmod 600 /home/nasser/.config/myinsta/youtube_cookies.txt
+python -m yt_dlp --js-runtimes node --remote-components ejs:github \
+  --cookies /home/nasser/.config/myinsta/youtube_cookies.txt \
+  -f "best[ext=mp4]/best" -o OUT URL
 ```
 
-6. In `backend/.env`:
+Incomplete cookies (SID only, no `LOGIN_INFO`) are **skipped** — they make bot checks worse.
+
+### Cookie rules (this caused most failures)
+
+1. Export from **https://www.youtube.com** while **signed in** (avatar visible).
+2. Play a video for a few seconds, then export with **Get cookies.txt LOCALLY**.
+3. Prefer a **small YouTube-only** dump, not a 190 KB “all sites” dump.
+4. File **must** contain `LOGIN_INFO` (and SID / `__Secure-1PSID`).
+5. After export, **verify on PC** before scp:
+
+```powershell
+Select-String -Path "C:\Users\nmtab\Downloads\youtube_cookies.txt" -Pattern "LOGIN_INFO"
+# size is often ~3KB when export is correct
+```
+
+6. scp the **exact** good file (check size after upload on VPS):
+
+```powershell
+scp "C:\Users\nmtab\Downloads\youtube_cookies.txt" nasser@VPS_IP:/home/nasser/.config/myinsta/youtube_cookies.txt
+```
+
+```bash
+ls -la /home/nasser/.config/myinsta/youtube_cookies.txt   # expect ~3056, not ~190000
+grep -c "LOGIN_INFO" /home/nasser/.config/myinsta/youtube_cookies.txt   # must be >= 1
+```
+
+7. If yt-dlp says cookies were **rotated**, re-export from a **dedicated Chrome profile**, close that profile, scp immediately (do not keep browsing YouTube in the same profile after export).
+
+8. Re-export when downloads break or every 1–2 weeks.
+
+### VPS verify (always use port 8010)
+
+```bash
+cd /opt/myinsta/backend && source .venv/bin/activate
+
+yt-dlp --js-runtimes node --remote-components ejs:github \
+  --cookies /home/nasser/.config/myinsta/youtube_cookies.txt \
+  -f "best[ext=mp4]/best" -o "/tmp/yt-ok.%(ext)s" \
+  "https://www.youtube.com/watch?v=jNQXAC9IVRw"
+
+sudo systemctl restart myinsta.service
+sleep 3
+curl -sS http://127.0.0.1:8010/health
+curl -sS http://127.0.0.1:8010/health/youtube | python3 -m json.tool
+```
+
+Health should show: `has_login_info: true`, `usable: true`, `node_ok_for_ejs: true`, Node **22+**.
+
+### Env (VPS)
 
 ```text
 YOUTUBE_COOKIES_FILE=/home/nasser/.config/myinsta/youtube_cookies.txt
 YOUTUBE_COOKIES_FROM_BROWSER=
+MYINSTA_MAX_YOUTUBE_DURATION_SECONDS=0
 ```
 
-7. Restart and diagnose:
+Do not use browser-cookie mode on the headless VPS. Keep only **one** of each env line (duplicates confuse debugging).
 
-```bash
-sudo systemctl restart myinsta.service
-curl -sS http://127.0.0.1:8000/health/youtube | python3 -m json.tool
-```
-
-Look for `cookies.usable: true`, `has_login_info` / `has_session_ids`, and Node path.
-
-Re-export cookies **weekly** (or whenever YouTube fails). If your VPS IP is
-heavily rate-limited, set `YOUTUBE_PROXY` or try from another network.
-### Cookies on local Windows
+### Local Windows (optional)
 
 ```text
-YOUTUBE_COOKIES_FROM_BROWSER=chrome
+YOUTUBE_COOKIES_FILE=C:/Users/nmtab/Downloads/youtube_cookies.txt
+# or: YOUTUBE_COOKIES_FROM_BROWSER=chrome
 ```
 
-Use `edge` or `firefox` if that is where you are signed in. Do **not** use
-browser-cookie mode on a headless VPS.
+Local MyInsta is **not** required to validate VPS cookies — VPS CLI test is enough.
 
-### Upgrade yt-dlp + Node
+### Node / yt-dlp upgrades
 
 ```bash
-# Node (Ubuntu/Debian example)
-sudo apt-get update && sudo apt-get install -y nodejs ffmpeg
+# Node must be v22+ for yt-dlp-ejs
+node -v
 
 cd /opt/myinsta/backend
 source .venv/bin/activate
-pip install -U "yt-dlp[default]"
+pip install -U "yt-dlp[default]" yt-dlp-ejs
 sudo systemctl restart myinsta.service
 ```
 
-### What the downloader tries now
+### Failure cheat sheet
 
-- Normalizes `youtu.be` / Shorts / embed URLs
-- Progressive MP4 first (fewer merge failures)
-- Modern player clients: default, `android_vr`, `mweb`, `web_safari`, `tv`…
-- Cookie file → browser cookies → cookieless fallback
-- Clearer user-facing errors (403, age-gate, missing Node, bad formats)
+| Symptom | Cause | Fix |
+|---------|--------|-----|
+| `login=no` / no LOGIN_INFO | Wrong or bulk cookie file on VPS | scp small YouTube-only export; verify size + grep |
+| Cookies no longer valid | Browser rotated session after export | Dedicated profile; export → close → scp immediately |
+| n challenge / no formats | Old Node or missing EJS | Node 22+; `pip install -U yt-dlp-ejs`; `--remote-components ejs:github` |
+| curl health Not Found on :8000 | Wrong port | Use **8010** |
+| curl right after restart fails | App not ready yet | `sleep 3` then retry |
 
-The backend requires `yt-dlp[default]>=2026.6.9`; older builds fail on current
-YouTube players even with valid cookies.
+The backend requires `yt-dlp[default]>=2026.6.9` and Node **>= 22** for current YouTube.
 
 ## Transcript and chat translation
 

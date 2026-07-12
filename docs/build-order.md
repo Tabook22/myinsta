@@ -71,6 +71,12 @@ sudo systemctl restart nginx
 sudo systemctl restart myinsta.service
 ```
 
+## YouTube VPS (working reference)
+
+See `backend/README.md` and `AGENTS.md` “YouTube on production VPS”.  
+API port **8010**, cookies need **LOGIN_INFO**, Node **22+**, CLI with
+`--js-runtimes node --remote-components ejs:github`. Confirmed working 2026-07-13.
+
 ## Next Work
 
 1. Add more tests around partial pipeline failures and library file cleanup.

@@ -25,40 +25,64 @@ uv pip install --no-build-isolation -r requirements.txt
 
 Open http://localhost:8000/docs after starting the server.
 
-## YouTube cookies
+## YouTube downloads (reliability)
 
-Some YouTube videos ask yt-dlp to prove the request is from a signed-in browser.
-For local Windows development, set this in `backend/.env` and restart the
-backend:
+YouTube actively blocks bots. Most MyInsta YouTube failures are fixed by:
+
+1. **Fresh cookies** (signed-in browser)
+2. **Latest `yt-dlp[default]`**
+3. **Node.js** on PATH (signature / EJS challenges)
+4. **FFmpeg** on PATH (merge video+audio when needed)
+
+### Cookies on a VPS (recommended)
+
+1. On your PC, open Chrome/Firefox while signed into YouTube.
+2. Install extension **Get cookies.txt LOCALLY**.
+3. Export `cookies.txt` for `youtube.com`.
+4. Copy to the server, e.g. `/home/nasser/.config/myinsta/youtube_cookies.txt`.
+5. In `backend/.env`:
+
+```text
+YOUTUBE_COOKIES_FILE=/home/nasser/.config/myinsta/youtube_cookies.txt
+YOUTUBE_COOKIES_FROM_BROWSER=
+```
+
+6. Restart the backend.
+
+Re-export cookies every few weeks (they expire) or whenever downloads start
+failing with “sign in / not a bot”.
+
+### Cookies on local Windows
 
 ```text
 YOUTUBE_COOKIES_FROM_BROWSER=chrome
 ```
 
-Use `edge` or `firefox` instead if that is where you are signed in. Do not use
-browser-cookie mode on a Hostinger VPS unless that server has a real logged-in
-browser profile.
+Use `edge` or `firefox` if that is where you are signed in. Do **not** use
+browser-cookie mode on a headless VPS.
 
-On a VPS, export a YouTube `cookies.txt` file from your local browser, copy it
-to the server, and set this in `backend/.env`:
-
-```text
-YOUTUBE_COOKIES_FILE=/home/nasser/.config/myinsta/youtube_cookies.txt
-```
-
-YouTube also changes its player code often. If yt-dlp shows `n challenge
-solving failed` or only lists storyboard/image formats, make sure Node.js is
-installed and upgrade yt-dlp with its default EJS solver package inside the
-backend virtualenv:
+### Upgrade yt-dlp + Node
 
 ```bash
+# Node (Ubuntu/Debian example)
+sudo apt-get update && sudo apt-get install -y nodejs ffmpeg
+
 cd /opt/myinsta/backend
-.venv/bin/python -m pip install --upgrade "yt-dlp[default]"
+source .venv/bin/activate
+pip install -U "yt-dlp[default]"
 sudo systemctl restart myinsta.service
 ```
 
-The backend requires `yt-dlp[default]>=2026.6.9`; older 2025 builds can fail on
-current YouTube player signatures even when the cookie file is valid.
+### What the downloader tries now
+
+- Normalizes `youtu.be` / Shorts / embed URLs
+- Progressive MP4 first (fewer merge failures)
+- Modern player clients: default, `android_vr`, `mweb`, `web_safari`, `tv`…
+- Cookie file → browser cookies → cookieless fallback
+- Clearer user-facing errors (403, age-gate, missing Node, bad formats)
+
+The backend requires `yt-dlp[default]>=2026.6.9`; older builds fail on current
+YouTube players even with valid cookies.
 
 ## Transcript and chat translation
 

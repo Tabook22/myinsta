@@ -1,11 +1,12 @@
 from app.services import video_downloader
 from app.services.video_downloader import (
-    _apply_cookie_options,
     _apply_youtube_runtime_options,
     _check_duration,
+    _cookie_modes_for,
     _extractor_args_for,
     _format_selectors_for,
     _friendly_download_error,
+    _normalize_url,
 )
 
 
@@ -17,7 +18,7 @@ def test_youtube_cookie_error_is_actionable():
 
     assert "YouTube blocked this download" in message
     assert "YOUTUBE_COOKIES_FILE" in message
-    assert "fresh cookies.txt" in message
+    assert "cookies.txt" in message.lower()
 
 
 def test_youtube_format_error_is_actionable():
@@ -26,34 +27,45 @@ def test_youtube_format_error_is_actionable():
         "youtube",
     )
 
-    assert "downloadable media format" in message
-    assert "updating yt-dlp" in message
+    assert "downloadable format" in message
+    assert "yt-dlp" in message
 
 
-def test_youtube_uses_multiple_format_selectors():
+def test_youtube_403_error_is_actionable():
+    message = _friendly_download_error(RuntimeError("HTTP Error 403: Forbidden"), "youtube")
+    assert "403" in message
+    assert "cookies" in message.lower()
+
+
+def test_youtube_uses_progressive_format_first():
     selectors = _format_selectors_for("youtube")
 
-    assert "bestvideo" in selectors[0]
-    assert "bestaudio" in selectors[0]
-    assert "best" in selectors
+    assert "best[ext=mp4]" in selectors[0]
+    assert "bestvideo" in selectors[1]
     assert selectors[-1] is None
     assert _format_selectors_for("instagram") == ["best[ext=mp4]/best"]
 
 
-def test_youtube_uses_multiple_extractor_clients():
+def test_youtube_uses_modern_extractor_clients():
     args = _extractor_args_for("youtube")
 
-    assert args[0]["youtube"]["player_client"] == ["android"]
-    assert args[1]["youtube"]["player_client"] == ["ios"]
-    assert args[-1] is None
+    # First attempt: yt-dlp defaults
+    assert args[0] is None
+    # Must include modern clients, not legacy ios-only
+    serialized = repr(args)
+    assert "android_vr" in serialized or "default" in serialized
+    assert "web_safari" in serialized or "mweb" in serialized
+    assert "['ios']" not in serialized
     assert _extractor_args_for("instagram") == [None]
 
 
-def test_youtube_enables_node_runtime():
+def test_youtube_enables_node_runtime_when_available(monkeypatch):
+    monkeypatch.setattr(video_downloader.shutil, "which", lambda name: "/usr/bin/node")
     ydl_opts = {}
     _apply_youtube_runtime_options(ydl_opts, "youtube")
 
     assert ydl_opts["js_runtimes"] == {"node": {}}
+    assert "remote_components" in ydl_opts
 
 
 def test_instagram_does_not_set_js_runtime():
@@ -82,24 +94,38 @@ def test_configured_youtube_duration_limit_blocks_long_videos(monkeypatch):
 
 def test_youtube_cookie_file_setting_is_used(monkeypatch, tmp_path):
     cookies = tmp_path / "youtube_cookies.txt"
-    cookies.write_text("# Netscape HTTP Cookie File\n", encoding="utf-8")
+    cookies.write_text("# Netscape HTTP Cookie File\n" + ("x" * 40), encoding="utf-8")
     monkeypatch.setattr(video_downloader.settings, "youtube_cookies_file", str(cookies))
     monkeypatch.setattr(video_downloader.settings, "youtube_cookies_from_browser", "")
     monkeypatch.setattr(video_downloader.settings, "instagram_cookies_file", "")
 
-    ydl_opts = {}
-    _apply_cookie_options(ydl_opts, "youtube")
+    modes = _cookie_modes_for("youtube")
+    assert any(m.get("cookiefile") == str(cookies) for m in modes)
+    assert modes[-1] == {}
 
-    assert ydl_opts["cookiefile"] == str(cookies)
 
-
-def test_youtube_browser_cookie_setting_wins(monkeypatch):
-    monkeypatch.setattr(video_downloader.settings, "youtube_cookies_file", "/tmp/missing.txt")
+def test_youtube_browser_cookie_mode_is_available(monkeypatch, tmp_path):
+    cookies = tmp_path / "youtube_cookies.txt"
+    cookies.write_text("# Netscape HTTP Cookie File\n" + ("x" * 40), encoding="utf-8")
+    monkeypatch.setattr(video_downloader.settings, "youtube_cookies_file", str(cookies))
     monkeypatch.setattr(video_downloader.settings, "youtube_cookies_from_browser", "chrome")
     monkeypatch.setattr(video_downloader.settings, "instagram_cookies_file", "")
 
-    ydl_opts = {}
-    _apply_cookie_options(ydl_opts, "youtube")
+    modes = _cookie_modes_for("youtube")
+    assert any(m.get("cookiefile") == str(cookies) for m in modes)
+    assert any(m.get("cookiesfrombrowser") == ("chrome",) for m in modes)
 
-    assert ydl_opts["cookiesfrombrowser"] == ("chrome",)
-    assert "cookiefile" not in ydl_opts
+
+def test_normalize_youtube_short_urls():
+    assert (
+        _normalize_url("https://youtu.be/dQw4w9WgXcQ", "youtube")
+        == "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+    )
+    assert (
+        _normalize_url("https://www.youtube.com/shorts/abc123XYZ", "youtube")
+        == "https://www.youtube.com/watch?v=abc123XYZ"
+    )
+    assert (
+        _normalize_url("https://www.youtube.com/watch?v=abc123XYZ&t=10s", "youtube")
+        == "https://www.youtube.com/watch?v=abc123XYZ"
+    )

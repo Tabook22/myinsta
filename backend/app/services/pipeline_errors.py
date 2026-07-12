@@ -22,6 +22,12 @@ def friendly_pipeline_error(exc: Exception) -> str:
         return message
     if message.startswith("YouTube videos longer than"):
         return message
+    if message.startswith("This YouTube video") or message.startswith("This video is age-restricted"):
+        return message
+    if message.startswith("YouTube returned HTTP") or message.startswith("YouTube signature"):
+        return message
+    if message.startswith("Download needed FFmpeg"):
+        return message
     if "ffmpeg is not installed" in lower:
         return message
     if "whisper is not installed" in lower:
@@ -38,6 +44,11 @@ def friendly_pipeline_error(exc: Exception) -> str:
             return "This video is unavailable or was removed. Check the link and try again."
         if "unsupported url" in lower or "no video formats" in lower:
             return "Could not find a downloadable video at this URL. Confirm it is a public Reel, Post, or YouTube video."
+        if "sign in" in lower or "not a bot" in lower or "cookies" in lower:
+            return message if message.startswith("YouTube") else (
+                "YouTube blocked this download. Refresh YOUTUBE_COOKIES_FILE, "
+                "upgrade yt-dlp[default], install Node.js, then retry."
+            )
         detail = _first_useful_line(message.replace("Video download failed:", "").strip())
         return f"Download failed: {detail}" if detail else "Download failed. Check the link and try again."
 

@@ -36,22 +36,41 @@ YouTube actively blocks bots. Most MyInsta YouTube failures are fixed by:
 
 ### Cookies on a VPS (recommended)
 
-1. On your PC, open Chrome/Firefox while signed into YouTube.
-2. Install extension **Get cookies.txt LOCALLY**.
-3. Export `cookies.txt` for `youtube.com`.
-4. Copy to the server, e.g. `/home/nasser/.config/myinsta/youtube_cookies.txt`.
-5. In `backend/.env`:
+**Important:** A large cookies file is not enough. It must be a **fresh Netscape**
+export from a browser **signed into youtube.com**, including `LOGIN_INFO` and/or
+`SID` / `__Secure-1PSID`. Stale cookies often make the bot check *worse*.
+
+1. On your PC, open Chrome/Firefox while signed into **https://www.youtube.com**.
+2. Play any video (so the session is warm).
+3. Install extension **Get cookies.txt LOCALLY**.
+4. Export cookies for the current site → `youtube_cookies.txt`.
+5. Copy to the server:
+
+```bash
+mkdir -p /home/nasser/.config/myinsta
+# from your PC (example):
+# scp youtube_cookies.txt nasser@YOUR_VPS:/home/nasser/.config/myinsta/youtube_cookies.txt
+chmod 600 /home/nasser/.config/myinsta/youtube_cookies.txt
+```
+
+6. In `backend/.env`:
 
 ```text
 YOUTUBE_COOKIES_FILE=/home/nasser/.config/myinsta/youtube_cookies.txt
 YOUTUBE_COOKIES_FROM_BROWSER=
 ```
 
-6. Restart the backend.
+7. Restart and diagnose:
 
-Re-export cookies every few weeks (they expire) or whenever downloads start
-failing with “sign in / not a bot”.
+```bash
+sudo systemctl restart myinsta.service
+curl -sS http://127.0.0.1:8000/health/youtube | python3 -m json.tool
+```
 
+Look for `cookies.usable: true`, `has_login_info` / `has_session_ids`, and Node path.
+
+Re-export cookies **weekly** (or whenever YouTube fails). If your VPS IP is
+heavily rate-limited, set `YOUTUBE_PROXY` or try from another network.
 ### Cookies on local Windows
 
 ```text

@@ -18,6 +18,8 @@ class Settings(BaseSettings):
     instagram_cookies_file: str = Field(default="", alias="INSTAGRAM_COOKIES_FILE")
     youtube_cookies_file: str = Field(default="", alias="YOUTUBE_COOKIES_FILE")
     youtube_cookies_from_browser: str = Field(default="", alias="YOUTUBE_COOKIES_FROM_BROWSER")
+    # Optional HTTP(S) proxy for YouTube only, e.g. http://user:pass@host:port
+    youtube_proxy: str = Field(default="", alias="YOUTUBE_PROXY")
 
     model_config = SettingsConfigDict(
         env_file=".env",

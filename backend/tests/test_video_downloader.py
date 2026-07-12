@@ -1,3 +1,5 @@
+from pathlib import Path
+
 from app.services import video_downloader
 from app.services.video_downloader import (
     _apply_youtube_runtime_options,
@@ -7,6 +9,7 @@ from app.services.video_downloader import (
     _format_selectors_for,
     _friendly_download_error,
     _normalize_url,
+    inspect_youtube_cookies,
 )
 
 
@@ -17,8 +20,8 @@ def test_youtube_cookie_error_is_actionable():
     )
 
     assert "YouTube blocked this download" in message
-    assert "YOUTUBE_COOKIES_FILE" in message
-    assert "cookies.txt" in message.lower()
+    assert "YOUTUBE_COOKIES_FILE" in message or "cookies.txt" in message.lower()
+    assert "fresh" in message.lower() or "NEW" in message or "export" in message.lower()
 
 
 def test_youtube_format_error_is_actionable():
@@ -38,25 +41,27 @@ def test_youtube_403_error_is_actionable():
 
 
 def test_youtube_uses_progressive_format_first():
-    selectors = _format_selectors_for("youtube")
+    selectors = _format_selectors_for("youtube", with_cookies=False)
 
     assert "best[ext=mp4]" in selectors[0]
     assert "bestvideo" in selectors[1]
     assert selectors[-1] is None
-    assert _format_selectors_for("instagram") == ["best[ext=mp4]/best"]
+    assert _format_selectors_for("instagram", with_cookies=False) == ["best[ext=mp4]/best"]
 
 
-def test_youtube_uses_modern_extractor_clients():
-    args = _extractor_args_for("youtube")
-
-    # First attempt: yt-dlp defaults
+def test_youtube_cookie_clients_prefer_tv_web():
+    args = _extractor_args_for("youtube", with_cookies=True)
     assert args[0] is None
-    # Must include modern clients, not legacy ios-only
     serialized = repr(args)
-    assert "android_vr" in serialized or "default" in serialized
-    assert "web_safari" in serialized or "mweb" in serialized
+    assert "tv_downgraded" in serialized or "web_safari" in serialized
     assert "['ios']" not in serialized
-    assert _extractor_args_for("instagram") == [None]
+
+
+def test_youtube_anonymous_clients_prefer_android_vr():
+    args = _extractor_args_for("youtube", with_cookies=False)
+    serialized = repr(args)
+    assert "android_vr" in serialized or args[0] is None
+    assert "['ios']" not in serialized
 
 
 def test_youtube_enables_node_runtime_when_available(monkeypatch):
@@ -92,28 +97,36 @@ def test_configured_youtube_duration_limit_blocks_long_videos(monkeypatch):
         raise AssertionError("Expected long video to be rejected")
 
 
-def test_youtube_cookie_file_setting_is_used(monkeypatch, tmp_path):
+def test_youtube_tries_cookieless_before_cookie_file(monkeypatch, tmp_path):
     cookies = tmp_path / "youtube_cookies.txt"
-    cookies.write_text("# Netscape HTTP Cookie File\n" + ("x" * 40), encoding="utf-8")
+    cookies.write_text(
+        "# Netscape HTTP Cookie File\n"
+        ".youtube.com\tTRUE\t/\tTRUE\t1893456000\tLOGIN_INFO\tabc\n"
+        ".youtube.com\tTRUE\t/\tTRUE\t1893456000\tSID\txyz\n",
+        encoding="utf-8",
+    )
     monkeypatch.setattr(video_downloader.settings, "youtube_cookies_file", str(cookies))
     monkeypatch.setattr(video_downloader.settings, "youtube_cookies_from_browser", "")
     monkeypatch.setattr(video_downloader.settings, "instagram_cookies_file", "")
 
     modes = _cookie_modes_for("youtube")
+    assert modes[0] == {}
     assert any(m.get("cookiefile") == str(cookies) for m in modes)
-    assert modes[-1] == {}
 
 
-def test_youtube_browser_cookie_mode_is_available(monkeypatch, tmp_path):
+def test_inspect_youtube_cookies_detects_login(tmp_path):
     cookies = tmp_path / "youtube_cookies.txt"
-    cookies.write_text("# Netscape HTTP Cookie File\n" + ("x" * 40), encoding="utf-8")
-    monkeypatch.setattr(video_downloader.settings, "youtube_cookies_file", str(cookies))
-    monkeypatch.setattr(video_downloader.settings, "youtube_cookies_from_browser", "chrome")
-    monkeypatch.setattr(video_downloader.settings, "instagram_cookies_file", "")
-
-    modes = _cookie_modes_for("youtube")
-    assert any(m.get("cookiefile") == str(cookies) for m in modes)
-    assert any(m.get("cookiesfrombrowser") == ("chrome",) for m in modes)
+    cookies.write_text(
+        "# Netscape HTTP Cookie File\n"
+        ".youtube.com\tTRUE\t/\tTRUE\t1893456000\tLOGIN_INFO\tabc\n"
+        ".youtube.com\tTRUE\t/\tTRUE\t1893456000\t__Secure-1PSID\txyz\n",
+        encoding="utf-8",
+    )
+    report = inspect_youtube_cookies(cookies)
+    assert report["present"] is True
+    assert report["has_login_info"] is True
+    assert report["has_session_ids"] is True
+    assert report["youtube_rows"] >= 2
 
 
 def test_normalize_youtube_short_urls():

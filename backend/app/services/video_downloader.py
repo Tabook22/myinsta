@@ -1,17 +1,20 @@
 """Download Instagram/YouTube media with yt-dlp.
 
-YouTube changes player clients often. This module:
-- prefers progressive MP4 when possible (no merge)
-- tries modern player clients (default, android_vr, mweb, web_safari, tv…)
-- avoids broken legacy clients (plain ios)
-- uses cookies file and/or browser cookies with clear failures
-- solves JS challenges via Node when available
+YouTube actively challenges automated clients. Strategy (2026):
+
+1. Prefer cookieless modern clients first for public videos
+   (stale/banned cookies often *cause* bot checks).
+2. Then try a validated cookies.txt with cookie-friendly clients
+   (tv_downgraded / web_safari / mweb — not plain ios).
+3. Progressive MP4 first to avoid merge failures.
+4. Node.js for signature / EJS challenges when available.
 """
 
 from __future__ import annotations
 
 import re
 import shutil
+import time
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
@@ -51,13 +54,11 @@ def _normalize_url(url: str, platform: str) -> str:
     parsed = urlparse(url.strip())
     host = parsed.netloc.lower().removeprefix("www.")
 
-    # youtu.be/<id>
     if host == "youtu.be":
         video_id = parsed.path.strip("/").split("/")[0]
         if video_id:
             return f"https://www.youtube.com/watch?v={video_id}"
 
-    # youtube.com/shorts/<id> or /live/<id> or /embed/<id>
     if "youtube.com" in host:
         parts = [p for p in parsed.path.split("/") if p]
         if len(parts) >= 2 and parts[0] in {"shorts", "live", "embed", "v"}:
@@ -87,12 +88,112 @@ def _youtube_browser() -> str | None:
     return browser or None
 
 
+def inspect_youtube_cookies(path: Path | None = None) -> dict:
+    """Inspect a Netscape cookies.txt for YouTube login usefulness."""
+    path = path or _youtube_cookies_file()
+    if not path or not path.is_file():
+        return {
+            "present": False,
+            "path": str(path) if path else None,
+            "usable": False,
+            "issues": ["Cookie file not found."],
+        }
+
+    try:
+        text = path.read_text(encoding="utf-8", errors="replace")
+    except OSError as exc:
+        return {
+            "present": True,
+            "path": str(path),
+            "usable": False,
+            "issues": [f"Cannot read cookie file: {exc}"],
+        }
+
+    age_days = max(0.0, (time.time() - path.stat().st_mtime) / 86400)
+    lines = text.splitlines()
+    data_lines = [ln for ln in lines if ln.strip() and not ln.startswith("#")]
+
+    # Netscape format is tab-separated: domain flag path secure expiry name value
+    yt_rows = []
+    names: set[str] = set()
+    for ln in data_lines:
+        if "youtube.com" not in ln and "google.com" not in ln:
+            continue
+        parts = ln.split("\t")
+        if len(parts) < 7:
+            # Some exporters use spaces — still count domain hits
+            if "youtube.com" in ln:
+                yt_rows.append(ln)
+            continue
+        domain, name = parts[0], parts[5]
+        if "youtube.com" in domain or "google.com" in domain:
+            yt_rows.append(ln)
+            names.add(name)
+
+    has_netscape_header = any(
+        "Netscape" in ln or "HTTP Cookie File" in ln for ln in lines[:8]
+    )
+    has_login = "LOGIN_INFO" in names
+    has_sid = bool(
+        names
+        & {
+            "SID",
+            "__Secure-1PSID",
+            "__Secure-3PSID",
+            "SAPISID",
+            "__Secure-1PSIDTS",
+            "APISID",
+            "HSID",
+            "SSID",
+        }
+    )
+
+    issues: list[str] = []
+    if not has_netscape_header and not yt_rows:
+        issues.append(
+            "File does not look like a Netscape cookies.txt (wrong export format)."
+        )
+    if len(yt_rows) < 3:
+        issues.append(
+            "Very few youtube.com/google.com cookies — re-export while signed into youtube.com."
+        )
+    if not has_login and not has_sid:
+        issues.append(
+            "Missing login cookies (LOGIN_INFO / SID / __Secure-1PSID). "
+            "Export while fully signed into YouTube, not a logged-out window."
+        )
+    if age_days >= 14:
+        issues.append(
+            f"Cookie file is {age_days:.0f} days old — YouTube sessions expire; export a fresh file."
+        )
+    elif age_days >= 7:
+        issues.append(
+            f"Cookie file is {age_days:.0f} days old — refresh if downloads keep failing."
+        )
+
+    usable = bool(yt_rows) and (has_login or has_sid) and not (
+        not has_netscape_header and not yt_rows
+    )
+
+    return {
+        "present": True,
+        "path": str(path),
+        "size": path.stat().st_size,
+        "age_days": round(age_days, 1),
+        "youtube_rows": len(yt_rows),
+        "has_login_info": has_login,
+        "has_session_ids": has_sid,
+        "usable": usable and not (age_days >= 21),
+        "issues": issues,
+    }
+
+
 def _cookie_modes_for(platform: str) -> list[dict]:
     """
-    Return cookie configurations to try, most reliable first.
+    Cookie configurations to try.
 
-    Each item is a partial ydl_opts dict (cookiefile and/or cookiesfrombrowser).
-    Always ends with {} so a cookieless attempt still runs for public videos.
+    For YouTube, try cookieless first — stale cookies frequently trigger bot checks.
+    Then try a validated cookie file / browser profile.
     """
     if platform != "youtube":
         modes: list[dict] = []
@@ -102,22 +203,19 @@ def _cookie_modes_for(platform: str) -> list[dict]:
         modes.append({})
         return modes
 
-    modes = []
-    browser = _youtube_browser()
-    cookie_file = _youtube_cookies_file()
+    modes: list[dict] = []
+    # 1) Public / no cookies — often works better when cookies are banned/stale
+    modes.append({})
 
-    # Prefer an explicit Netscape cookies file on servers (stable).
-    if cookie_file:
+    cookie_file = _youtube_cookies_file()
+    report = inspect_youtube_cookies(cookie_file) if cookie_file else None
+    if cookie_file and report and report.get("youtube_rows", 0) > 0:
         modes.append({"cookiefile": str(cookie_file)})
 
-    # Browser profile is handy on local Windows/macOS.
+    browser = _youtube_browser()
     if browser:
         modes.append({"cookiesfrombrowser": (browser,)})
 
-    # Public videos sometimes work without cookies.
-    modes.append({})
-
-    # De-dupe while preserving order
     seen: set[str] = set()
     unique: list[dict] = []
     for mode in modes:
@@ -132,11 +230,10 @@ def _apply_youtube_runtime_options(ydl_opts: dict, platform: str) -> None:
     if platform != "youtube":
         return
 
-    # Needed for "n" signature / EJS challenge solving on many videos.
     if shutil.which("node"):
         ydl_opts["js_runtimes"] = {"node": {}}
 
-    # Let yt-dlp pull remote EJS components when the package supports it.
+    # Optional remote EJS solver components (ignored by older yt-dlp builds)
     ydl_opts.setdefault("remote_components", ["ejs:github"])
 
 
@@ -145,68 +242,80 @@ def _cookie_status_for(platform: str) -> str:
         return ""
 
     parts: list[str] = []
-    cookie_file = _youtube_cookies_file()
-    browser = _youtube_browser()
-
-    if cookie_file:
+    report = inspect_youtube_cookies()
+    if report.get("present"):
         parts.append(
-            f"Cookie file OK: {cookie_file} ({cookie_file.stat().st_size} bytes)."
+            f"Cookie file: {report.get('path')} "
+            f"({report.get('size', 0)} bytes, {report.get('age_days', '?')} days old, "
+            f"{report.get('youtube_rows', 0)} YouTube rows, "
+            f"login={'yes' if report.get('has_login_info') else 'no'}, "
+            f"session={'yes' if report.get('has_session_ids') else 'no'})."
         )
+        for issue in report.get("issues") or []:
+            parts.append(f"⚠ {issue}")
     else:
         configured = settings.youtube_cookies_file or settings.instagram_cookies_file
         if configured:
-            parts.append(f"Configured cookie file missing or empty: {configured}.")
+            parts.append(f"Configured cookie file missing: {configured}.")
         else:
             parts.append("No YOUTUBE_COOKIES_FILE is configured.")
 
+    browser = _youtube_browser()
     if browser:
         parts.append(f"Browser cookie source: {browser}.")
-    else:
-        parts.append("YOUTUBE_COOKIES_FROM_BROWSER is not set.")
 
     if not shutil.which("node"):
-        parts.append(
-            "Node.js is not on PATH (recommended for YouTube signature solving)."
-        )
+        parts.append("Node.js is not on PATH (needed for many YouTube signatures).")
 
     return " ".join(parts)
 
 
-def _format_selectors_for(platform: str) -> list[str | None]:
-    """Prefer simple progressive MP4 first — fewer merge failures."""
-    if platform == "youtube":
-        return [
-            # Progressive MP4 only (single file, no ffmpeg merge)
-            "best[ext=mp4][vcodec!=none][acodec!=none]/best[ext=mp4]/best",
-            # Separate streams merged to mp4
-            "bestvideo[height<=1080][ext=mp4]+bestaudio[ext=m4a]/bestvideo[height<=1080]+bestaudio/best[ext=mp4]/best",
-            "bestvideo+bestaudio/best",
-            "best",
-            None,
-        ]
-    return ["best[ext=mp4]/best"]
+def _format_selectors_for(platform: str, *, with_cookies: bool) -> list[str | None]:
+    """Prefer progressive MP4; slightly different order with cookies."""
+    if platform != "youtube":
+        return ["best[ext=mp4]/best"]
+
+    progressive = "best[ext=mp4][vcodec!=none][acodec!=none]/best[ext=mp4]/best"
+    merged = (
+        "bestvideo[height<=1080][ext=mp4]+bestaudio[ext=m4a]/"
+        "bestvideo[height<=1080]+bestaudio/best[ext=mp4]/best"
+    )
+    if with_cookies:
+        # Logged-in clients often expose dash/hls that need merge
+        return [progressive, merged, "bestvideo+bestaudio/best", "best", None]
+    return [progressive, merged, "best", None]
 
 
-def _extractor_args_for(platform: str) -> list[dict | None]:
+def _extractor_args_for(platform: str, *, with_cookies: bool) -> list[dict | None]:
     """
-    Modern YouTube player clients (2026).
+    Player clients ordered by likelihood of success.
 
-    Avoid plain `ios` (often HTTP 400). Prefer yt-dlp defaults, then
-    android_vr / mweb / web_safari / tv clients used by current yt-dlp.
+    With cookies: tv_downgraded + web_safari (yt-dlp default for logged-in free accounts).
+    Without: android_vr + web_safari (yt-dlp default for anonymous).
+    Avoid plain `ios` (HTTP 400 on many builds).
     """
-    if platform == "youtube":
+    if platform != "youtube":
+        return [None]
+
+    if with_cookies:
         return [
-            # Let yt-dlp choose (android_vr + web_safari, or tv_downgraded when cookies)
+            # yt-dlp picks tv_downgraded,web_safari when it detects account cookies
             None,
-            {"youtube": {"player_client": ["default"]}},
-            {"youtube": {"player_client": ["android_vr", "web_safari"]}},
+            {"youtube": {"player_client": ["tv_downgraded", "web_safari"]}},
             {"youtube": {"player_client": ["mweb", "web_safari"]}},
-            {"youtube": {"player_client": ["tv", "tv_downgraded"]}},
-            {"youtube": {"player_client": ["web_embedded", "web"]}},
-            # Last resort: android only (sometimes still works for public videos)
-            {"youtube": {"player_client": ["android"]}},
+            {"youtube": {"player_client": ["web", "web_safari"]}},
+            {"youtube": {"player_client": ["tv", "web_embedded"]}},
+            {"youtube": {"player_client": ["default"]}},
         ]
-    return [None]
+
+    return [
+        None,
+        {"youtube": {"player_client": ["android_vr", "web_safari"]}},
+        {"youtube": {"player_client": ["mweb", "android_vr"]}},
+        {"youtube": {"player_client": ["web_safari", "web"]}},
+        {"youtube": {"player_client": ["web_embedded", "mweb"]}},
+        {"youtube": {"player_client": ["android"]}},
+    ]
 
 
 def _base_ydl_opts(output_template: str, platform: str) -> dict:
@@ -225,8 +334,10 @@ def _base_ydl_opts(output_template: str, platform: str) -> dict:
         "file_access_retries": 3,
         "socket_timeout": 30,
         "concurrent_fragment_downloads": 1,
-        # Prefer free formats when SABR/premium-only streams appear
-        "extractor_args": {},
+        # Small pauses reduce YouTube rate-limit / bot scoring
+        "sleep_interval_requests": 1,
+        "sleep_interval": 1,
+        "max_sleep_interval": 3,
     }
 
     if platform == "youtube":
@@ -237,10 +348,18 @@ def _base_ydl_opts(output_template: str, platform: str) -> dict:
                 "Chrome/131.0.0.0 Safari/537.36"
             ),
             "Accept-Language": "en-US,en;q=0.9",
+            "Origin": "https://www.youtube.com",
+            "Referer": "https://www.youtube.com/",
         }
 
     _apply_youtube_runtime_options(opts, platform)
+
+    proxy = (getattr(settings, "youtube_proxy", None) or "").strip()
+    if platform == "youtube" and proxy:
+        opts["proxy"] = proxy
+
     return opts
+
 
 def _friendly_download_error(error: Exception, platform: str) -> str:
     message = str(error)
@@ -257,9 +376,13 @@ def _friendly_download_error(error: Exception, platform: str) -> str:
             return (
                 "YouTube blocked this download (bot/sign-in check). "
                 f"{_cookie_status_for(platform)} "
-                "Fix: export a fresh cookies.txt from a browser signed into YouTube "
-                "(extension: 'Get cookies.txt LOCALLY'), set YOUTUBE_COOKIES_FILE, "
-                "upgrade yt-dlp[default], ensure Node.js is installed, then retry."
+                "Do this on a machine where YouTube works in the browser: "
+                "(1) Sign into youtube.com, open any video, "
+                "(2) export a NEW cookies.txt with 'Get cookies.txt LOCALLY' "
+                "(must include LOGIN_INFO / SID cookies), "
+                "(3) replace the file on the VPS and restart myinsta.service, "
+                "(4) pip install -U 'yt-dlp[default]' and ensure Node.js is installed. "
+                "Note: old cookies can make blocking worse — re-export weekly."
             )
 
         if "requested format is not available" in lower or "no video formats" in lower:
@@ -270,21 +393,24 @@ def _friendly_download_error(error: Exception, platform: str) -> str:
             )
 
         if "private video" in lower or "this video is private" in lower:
-            return "This YouTube video is private. Sign in with cookies that can access it, or use a public link."
+            return (
+                "This YouTube video is private. Use cookies from an account that can "
+                "watch it, or pick a public link."
+            )
 
         if "video unavailable" in lower or "has been removed" in lower:
             return "This YouTube video is unavailable or was removed. Check the link."
 
         if "age" in lower and ("restrict" in lower or "confirm your age" in lower):
             return (
-                "This video is age-restricted. Export cookies from a signed-in YouTube "
-                "account that can watch it, set YOUTUBE_COOKIES_FILE, and retry."
+                "This video is age-restricted. Export cookies from a signed-in adult "
+                "YouTube account, set YOUTUBE_COOKIES_FILE, and retry."
             )
 
-        if "http error 403" in lower or "403" in lower:
+        if "http error 403" in lower or re.search(r"\b403\b", lower):
             return (
                 "YouTube returned HTTP 403 (forbidden). Refresh cookies, update yt-dlp, "
-                "and try again. Some formats need a logged-in session."
+                "and try again. If cookies are old, export a fresh file."
             )
 
         if "n challenge" in lower or "js interpreter" in lower or "ejs" in lower:
@@ -305,13 +431,14 @@ def _friendly_download_error(error: Exception, platform: str) -> str:
     return f"Video download failed: {detail}"
 
 
-def _resolve_output_path(info: dict, ydl: yt_dlp.YoutubeDL, output_dir: Path, video_id: int) -> Path:
+def _resolve_output_path(
+    info: dict, ydl: yt_dlp.YoutubeDL, output_dir: Path, video_id: int
+) -> Path:
     """Find the real file after download (handles merge renames)."""
     requested = Path(ydl.prepare_filename(info))
     if requested.exists():
         return requested
 
-    # After merge, extension is often mp4 regardless of original
     stem = output_dir / str(video_id)
     for ext in (".mp4", ".mkv", ".webm", ".m4a", ".mp3"):
         candidate = Path(str(stem) + ext)
@@ -319,11 +446,11 @@ def _resolve_output_path(info: dict, ydl: yt_dlp.YoutubeDL, output_dir: Path, vi
             return candidate
 
     matches = sorted(
-        p for p in output_dir.glob(f"{video_id}.*")
+        p
+        for p in output_dir.glob(f"{video_id}.*")
         if p.is_file() and p.suffix.lower() not in {".part", ".ytdl", ".temp"}
     )
     if matches:
-        # Prefer largest non-empty file
         matches.sort(key=lambda p: p.stat().st_size, reverse=True)
         if matches[0].stat().st_size > 0:
             return matches[0]
@@ -331,7 +458,49 @@ def _resolve_output_path(info: dict, ydl: yt_dlp.YoutubeDL, output_dir: Path, vi
     raise RuntimeError("Video download failed: output file not found")
 
 
-def download_video(url: str, output_dir: Path, video_id: int, platform: str = "instagram") -> dict:
+def _attempt_download(
+    url: str,
+    output_dir: Path,
+    video_id: int,
+    platform: str,
+    base_opts: dict,
+    cookie_mode: dict,
+    extractor_args: dict | None,
+    selector: str | None,
+) -> tuple[dict, Path]:
+    current_opts = dict(base_opts)
+    current_opts.update(cookie_mode)
+
+    if extractor_args:
+        current_opts["extractor_args"] = extractor_args
+    else:
+        current_opts.pop("extractor_args", None)
+
+    if selector:
+        current_opts["format"] = selector
+    else:
+        current_opts.pop("format", None)
+
+    with yt_dlp.YoutubeDL(current_opts) as ydl:
+        extracted = ydl.extract_info(url, download=True)
+        if extracted is None:
+            raise RuntimeError("no metadata returned")
+
+        if extracted.get("_type") == "playlist" and extracted.get("entries"):
+            extracted = next((e for e in extracted["entries"] if e), None)
+            if extracted is None:
+                raise RuntimeError("playlist contained no videos")
+
+        _check_duration(extracted, platform)
+        path = _resolve_output_path(extracted, ydl, output_dir, video_id)
+        if path.stat().st_size <= 0:
+            raise RuntimeError("downloaded file is empty")
+        return extracted, path
+
+
+def download_video(
+    url: str, output_dir: Path, video_id: int, platform: str = "instagram"
+) -> dict:
     """Download a video with yt-dlp and return metadata plus local path."""
     output_dir.mkdir(parents=True, exist_ok=True)
     url = _normalize_url(url, platform)
@@ -343,54 +512,36 @@ def download_video(url: str, output_dir: Path, video_id: int, platform: str = "i
     info: dict | None = None
 
     cookie_modes = _cookie_modes_for(platform)
-    extractor_modes = _extractor_args_for(platform)
-    format_modes = _format_selectors_for(platform)
 
+    # Cap total attempts so processing fails fast with a clear message
+    max_attempts = 18
     attempt_index = 0
+
     for cookie_mode in cookie_modes:
+        with_cookies = bool(cookie_mode)
+        extractor_modes = _extractor_args_for(platform, with_cookies=with_cookies)
+        format_modes = _format_selectors_for(platform, with_cookies=with_cookies)
+
         for extractor_args in extractor_modes:
             for selector in format_modes:
                 attempt_index += 1
-                current_opts = dict(base_opts)
-                current_opts.update(cookie_mode)
-
-                # Merge extractor_args carefully (base may already have empty dict)
-                if extractor_args:
-                    current_opts["extractor_args"] = extractor_args
-                else:
-                    current_opts.pop("extractor_args", None)
-
-                if selector:
-                    current_opts["format"] = selector
-                else:
-                    current_opts.pop("format", None)
-
+                if attempt_index > max_attempts:
+                    break
                 try:
                     if attempt_index > 1:
                         _clear_partial_downloads(output_dir, video_id)
-
-                    with yt_dlp.YoutubeDL(current_opts) as ydl:
-                        # Single pass: download + metadata (avoids double YouTube hits)
-                        extracted = ydl.extract_info(url, download=True)
-                        if extracted is None:
-                            raise RuntimeError("no metadata returned")
-
-                        # Playlist safety — take first entry if nested
-                        if extracted.get("_type") == "playlist" and extracted.get("entries"):
-                            extracted = next(
-                                (e for e in extracted["entries"] if e),
-                                None,
-                            )
-                            if extracted is None:
-                                raise RuntimeError("playlist contained no videos")
-
-                        _check_duration(extracted, platform)
-                        path = _resolve_output_path(extracted, ydl, output_dir, video_id)
-                        if path.stat().st_size <= 0:
-                            raise RuntimeError("downloaded file is empty")
-
-                        info = extracted
-                        local_path = path
+                    extracted, path = _attempt_download(
+                        url,
+                        output_dir,
+                        video_id,
+                        platform,
+                        base_opts,
+                        cookie_mode,
+                        extractor_args,
+                        selector,
+                    )
+                    info = extracted
+                    local_path = path
                     break
                 except Exception as exc:
                     last_error = exc
@@ -401,7 +552,9 @@ def download_video(url: str, output_dir: Path, video_id: int, platform: str = "i
             break
 
     if not local_path or not info:
-        raise RuntimeError(_friendly_download_error(last_error or RuntimeError("unknown"), platform)) from last_error
+        raise RuntimeError(
+            _friendly_download_error(last_error or RuntimeError("unknown"), platform)
+        ) from last_error
 
     uploader_url = info.get("uploader_url") or info.get("channel_url") or None
     uploader_id = info.get("uploader_id") or info.get("channel_id") or None
@@ -409,7 +562,6 @@ def download_video(url: str, output_dir: Path, video_id: int, platform: str = "i
     if not uploader_url and uploader_id and platform == "instagram":
         uploader_url = f"https://www.instagram.com/{uploader_id}/"
 
-    # Prefer highest-res thumbnail when list is present
     thumbnail = info.get("thumbnail")
     thumbnails = info.get("thumbnails") or []
     if thumbnails:

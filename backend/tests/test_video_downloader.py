@@ -107,7 +107,7 @@ def test_configured_youtube_duration_limit_blocks_long_videos(monkeypatch):
         raise AssertionError("Expected long video to be rejected")
 
 
-def test_youtube_tries_cookieless_before_cookie_file(monkeypatch, tmp_path):
+def test_youtube_tries_cookie_file_before_cookieless(monkeypatch, tmp_path):
     cookies = tmp_path / "youtube_cookies.txt"
     cookies.write_text(
         "# Netscape HTTP Cookie File\n"
@@ -120,8 +120,8 @@ def test_youtube_tries_cookieless_before_cookie_file(monkeypatch, tmp_path):
     monkeypatch.setattr(video_downloader.settings, "instagram_cookies_file", "")
 
     modes = _cookie_modes_for("youtube")
-    assert modes[0] == {}
-    assert any(m.get("cookiefile") == str(cookies) for m in modes)
+    assert modes[0].get("cookiefile") == str(cookies)
+    assert modes[-1] == {}
 
 
 def test_inspect_youtube_cookies_detects_login(tmp_path):

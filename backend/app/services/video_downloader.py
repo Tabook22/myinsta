@@ -12,8 +12,11 @@ YouTube actively challenges automated clients. Strategy (2026):
 
 from __future__ import annotations
 
+import json
 import re
 import shutil
+import subprocess
+import sys
 import time
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
@@ -192,8 +195,8 @@ def _cookie_modes_for(platform: str) -> list[dict]:
     """
     Cookie configurations to try.
 
-    For YouTube, try cookieless first — stale cookies frequently trigger bot checks.
-    Then try a validated cookie file / browser profile.
+    For YouTube with a usable cookies.txt, prefer cookies first (matches the
+    working VPS CLI). Cookieless is a fallback for public videos.
     """
     if platform != "youtube":
         modes: list[dict] = []
@@ -204,9 +207,6 @@ def _cookie_modes_for(platform: str) -> list[dict]:
         return modes
 
     modes: list[dict] = []
-    # 1) Public / no cookies — often works better when cookies are banned/stale
-    modes.append({})
-
     cookie_file = _youtube_cookies_file()
     report = inspect_youtube_cookies(cookie_file) if cookie_file else None
     if cookie_file and report and report.get("youtube_rows", 0) > 0:
@@ -215,6 +215,9 @@ def _cookie_modes_for(platform: str) -> list[dict]:
     browser = _youtube_browser()
     if browser:
         modes.append({"cookiesfrombrowser": (browser,)})
+
+    # Anonymous fallback (some public videos work without cookies)
+    modes.append({})
 
     seen: set[str] = set()
     unique: list[dict] = []
@@ -273,9 +276,8 @@ def _js_runtime_opts() -> dict:
     if runtimes:
         opts["js_runtimes"] = runtimes
 
-    # Allow yt-dlp to fetch the challenge solver scripts from GitHub/npm.
-    # Critical when the packaged solver is outdated.
-    opts["remote_components"] = {"ejs:github", "ejs:npm"}
+    # Allow yt-dlp to fetch the challenge solver scripts (CLI: --remote-components ejs:github)
+    opts["remote_components"] = {"ejs:github"}
     return opts
 
 
@@ -552,6 +554,9 @@ def _attempt_download(
 ) -> tuple[dict, Path]:
     current_opts = dict(base_opts)
     current_opts.update(cookie_mode)
+    # Always re-apply EJS/runtime opts last so they are never dropped
+    if platform == "youtube":
+        current_opts.update(_js_runtime_opts())
 
     if extractor_args:
         current_opts["extractor_args"] = extractor_args
@@ -580,6 +585,145 @@ def _attempt_download(
         return extracted, path
 
 
+def _download_youtube_via_cli(
+    url: str, output_dir: Path, video_id: int, cookie_file: Path | None
+) -> tuple[dict, Path]:
+    """
+    Download YouTube using the same yt-dlp CLI flags proven on the VPS.
+
+    CLI path is more reliable than the Python API for EJS / node integration.
+    """
+    outtmpl = str((output_dir / f"{video_id}.%(ext)s").resolve())
+    cmd = [
+        sys.executable,
+        "-m",
+        "yt_dlp",
+        "--js-runtimes",
+        "node",
+        "--remote-components",
+        "ejs:github",
+        "-f",
+        "best[ext=mp4][vcodec!=none][acodec!=none]/best[ext=mp4]/best",
+        "--merge-output-format",
+        "mp4",
+        "--no-playlist",
+        "--no-progress",
+        "-o",
+        outtmpl,
+        "--print-json",
+        "--no-simulate",
+    ]
+    if cookie_file and cookie_file.is_file():
+        cmd.extend(["--cookies", str(cookie_file)])
+
+    proxy = (getattr(settings, "youtube_proxy", None) or "").strip()
+    if proxy:
+        cmd.extend(["--proxy", proxy])
+
+    cmd.append(url)
+
+    # Ensure node is visible even if systemd PATH is minimal
+    env = None
+    try:
+        import os
+
+        env = os.environ.copy()
+        path_parts = env.get("PATH", "").split(os.pathsep)
+        for extra in ("/usr/bin", "/usr/local/bin"):
+            if extra not in path_parts:
+                path_parts.insert(0, extra)
+        env["PATH"] = os.pathsep.join(path_parts)
+    except Exception:
+        env = None
+
+    result = subprocess.run(
+        cmd,
+        capture_output=True,
+        text=True,
+        timeout=900,
+        check=False,
+        env=env,
+    )
+    if result.returncode != 0:
+        err = (result.stderr or result.stdout or "yt-dlp failed").strip()
+        # Keep last useful chunk
+        lines = [ln for ln in err.splitlines() if ln.strip()]
+        detail = "\n".join(lines[-12:]) if lines else "yt-dlp failed"
+        raise RuntimeError(detail)
+
+    # --print-json emits one JSON object per line on stdout after download
+    info: dict | None = None
+    for line in reversed((result.stdout or "").splitlines()):
+        line = line.strip()
+        if not line.startswith("{"):
+            continue
+        try:
+            info = json.loads(line)
+            break
+        except json.JSONDecodeError:
+            continue
+
+    path = None
+    if info:
+        # Prefer requested downloads paths
+        req = info.get("requested_downloads") or []
+        if req and req[0].get("filepath"):
+            path = Path(req[0]["filepath"])
+        elif info.get("filename"):
+            path = Path(info["filename"])
+        elif info.get("_filename"):
+            path = Path(info["_filename"])
+
+    if path is None or not path.exists():
+        matches = sorted(
+            p
+            for p in output_dir.glob(f"{video_id}.*")
+            if p.is_file() and p.suffix.lower() not in {".part", ".ytdl", ".temp"}
+        )
+        if not matches:
+            raise RuntimeError("yt-dlp CLI finished but output file not found")
+        matches.sort(key=lambda p: p.stat().st_size, reverse=True)
+        path = matches[0]
+        if info is None:
+            info = {"title": path.stem, "duration": None}
+
+    if path.stat().st_size <= 0:
+        raise RuntimeError("downloaded file is empty")
+
+    _check_duration(info, "youtube")
+    return info, path
+
+
+def _metadata_from_info(info: dict, platform: str, local_path: Path) -> dict:
+    uploader_url = info.get("uploader_url") or info.get("channel_url") or None
+    uploader_id = info.get("uploader_id") or info.get("channel_id") or None
+
+    if not uploader_url and uploader_id and platform == "instagram":
+        uploader_url = f"https://www.instagram.com/{uploader_id}/"
+
+    thumbnail = info.get("thumbnail")
+    thumbnails = info.get("thumbnails") or []
+    if thumbnails:
+        best_thumb = max(
+            (t for t in thumbnails if t.get("url")),
+            key=lambda t: (t.get("height") or 0) * (t.get("width") or 0),
+            default=None,
+        )
+        if best_thumb:
+            thumbnail = best_thumb.get("url") or thumbnail
+
+    return {
+        "platform": platform,
+        "title": info.get("title"),
+        "description": info.get("description"),
+        "uploader": info.get("uploader") or info.get("channel"),
+        "uploader_url": uploader_url,
+        "duration_seconds": info.get("duration"),
+        "thumbnail_url": thumbnail,
+        "local_video_path": str(local_path.resolve()),
+    }
+
+
 def download_video(
     url: str, output_dir: Path, video_id: int, platform: str = "instagram"
 ) -> dict:
@@ -588,15 +732,39 @@ def download_video(
     url = _normalize_url(url, platform)
     output_template = str((output_dir / f"{video_id}.%(ext)s").resolve())
 
+    # ── YouTube: CLI path first (proven on VPS with Node 22 + EJS + cookies) ──
+    if platform == "youtube":
+        last_cli_error: Exception | None = None
+        cookie_file = _youtube_cookies_file()
+        # Prefer cookies when present; also try without
+        cookie_tries: list[Path | None] = []
+        if cookie_file:
+            cookie_tries.append(cookie_file)
+        cookie_tries.append(None)
+
+        for cookies in cookie_tries:
+            try:
+                _clear_partial_downloads(output_dir, video_id)
+                info, path = _download_youtube_via_cli(
+                    url, output_dir, video_id, cookies
+                )
+                return _metadata_from_info(info, platform, path)
+            except Exception as exc:
+                last_cli_error = exc
+
+        # Fall through to Python API as secondary path
+        last_error: Exception | None = last_cli_error
+    else:
+        last_error = None
+
     base_opts = _base_ydl_opts(output_template, platform)
-    last_error: Exception | None = None
     local_path: Path | None = None
     info: dict | None = None
 
     cookie_modes = _cookie_modes_for(platform)
 
-    # Cap total attempts so processing fails fast with a clear message
-    max_attempts = 18
+    # Fewer attempts for YouTube (CLI already tried the good path)
+    max_attempts = 8 if platform == "youtube" else 18
     attempt_index = 0
 
     for cookie_mode in cookie_modes:
@@ -638,30 +806,4 @@ def download_video(
             _friendly_download_error(last_error or RuntimeError("unknown"), platform)
         ) from last_error
 
-    uploader_url = info.get("uploader_url") or info.get("channel_url") or None
-    uploader_id = info.get("uploader_id") or info.get("channel_id") or None
-
-    if not uploader_url and uploader_id and platform == "instagram":
-        uploader_url = f"https://www.instagram.com/{uploader_id}/"
-
-    thumbnail = info.get("thumbnail")
-    thumbnails = info.get("thumbnails") or []
-    if thumbnails:
-        best_thumb = max(
-            (t for t in thumbnails if t.get("url")),
-            key=lambda t: (t.get("height") or 0) * (t.get("width") or 0),
-            default=None,
-        )
-        if best_thumb:
-            thumbnail = best_thumb.get("url") or thumbnail
-
-    return {
-        "platform": platform,
-        "title": info.get("title"),
-        "description": info.get("description"),
-        "uploader": info.get("uploader") or info.get("channel"),
-        "uploader_url": uploader_url,
-        "duration_seconds": info.get("duration"),
-        "thumbnail_url": thumbnail,
-        "local_video_path": str(local_path.resolve()),
-    }
+    return _metadata_from_info(info, platform, local_path)

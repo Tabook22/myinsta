@@ -1,4 +1,5 @@
 import json
+import zipfile
 from pathlib import Path
 
 import pytest
@@ -15,15 +16,18 @@ def client(tmp_path, monkeypatch):
     download_dir = tmp_path / "downloads"
     audio_dir = tmp_path / "audio"
     library_dir = tmp_path / "library"
+    wiki_dir = tmp_path / "mywiki"
 
     monkeypatch.setattr("app.core.config.settings.database_path", str(db_path))
     monkeypatch.setattr("app.core.config.settings.download_dir", str(download_dir))
     monkeypatch.setattr("app.core.config.settings.audio_dir", str(audio_dir))
     monkeypatch.setattr("app.core.config.settings.library_dir", str(library_dir))
+    monkeypatch.setattr("app.core.config.settings.wiki_dir", str(wiki_dir))
     monkeypatch.setattr("app.core.config.settings.database_file", db_path)
     monkeypatch.setattr("app.core.config.settings.download_path", download_dir)
     monkeypatch.setattr("app.core.config.settings.audio_path", audio_dir)
     monkeypatch.setattr("app.core.config.settings.library_path", library_dir)
+    monkeypatch.setattr("app.core.config.settings.wiki_path", wiki_dir)
 
     init_db()
     return TestClient(app)
@@ -199,6 +203,91 @@ def test_update_and_delete_video(client, monkeypatch, tmp_path):
     assert delete_response.status_code == 204
     assert client.get(f"/api/videos/{video_id}").status_code == 404
     assert folder.exists()
+
+
+def test_full_backup_download_includes_database_library_and_manifest(client, tmp_path):
+    from app.core.config import settings
+
+    folder = settings.library_path / "2026" / "05" / "20260529_120000_backup-test"
+    folder.mkdir(parents=True)
+    video_file = folder / "video.mp4"
+    video_file.write_bytes(b"fake-video")
+    audio_file = folder / "audio.wav"
+    audio_file.write_bytes(b"fake-audio")
+    transcript_file = folder / "transcript.txt"
+    transcript_file.write_text("Backup transcript", encoding="utf-8")
+
+    settings.wiki_path.mkdir(parents=True, exist_ok=True)
+    wiki_file = settings.wiki_path / "backup-test.md"
+    wiki_file.write_text("# Backup test", encoding="utf-8")
+
+    with get_connection() as conn:
+        cursor = conn.execute(
+            """
+            INSERT INTO videos (
+                source_url, status, title, local_video_path, local_audio_path,
+                storage_stamp, storage_folder, local_transcript_path, deleted_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+            """,
+            (
+                "https://www.youtube.com/watch?v=BACKUP",
+                "ready",
+                "Backup test",
+                str(video_file),
+                str(audio_file),
+                folder.name,
+                "2026/05/20260529_120000_backup-test",
+                str(transcript_file),
+            ),
+        )
+        video_id = cursor.lastrowid
+        conn.execute(
+            """
+            INSERT INTO transcripts (video_id, language, full_text, segments_json)
+            VALUES (?, ?, ?, ?)
+            """,
+            (video_id, "en", "Backup transcript", "[]"),
+        )
+        conn.execute(
+            "INSERT INTO chat_messages (video_id, role, content) VALUES (?, ?, ?)",
+            (video_id, "user", "Save this?"),
+        )
+        conn.execute(
+            """
+            INSERT INTO wiki_documents (video_id, title, filename, file_path)
+            VALUES (?, ?, ?, ?)
+            """,
+            (video_id, "Backup test", wiki_file.name, str(wiki_file)),
+        )
+
+    response = client.get("/api/videos/backup")
+
+    assert response.status_code == 200
+    assert response.headers["content-type"] == "application/zip"
+    assert "myinsta-backup-" in response.headers["content-disposition"]
+
+    archive_path = tmp_path / "backup.zip"
+    archive_path.write_bytes(response.content)
+    with zipfile.ZipFile(archive_path) as archive:
+        names = set(archive.namelist())
+        assert "database/myinsta.sqlite3" in names
+        assert "manifest.json" in names
+        assert "data/videos.json" in names
+        assert "data/transcripts.json" in names
+        assert "data/chat_messages.json" in names
+        assert "data/wiki_documents.json" in names
+        assert "library/2026/05/20260529_120000_backup-test/video.mp4" in names
+        assert "library/2026/05/20260529_120000_backup-test/audio.wav" in names
+        assert "library/2026/05/20260529_120000_backup-test/transcript.txt" in names
+        assert "mywiki/backup-test.md" in names
+        assert not any("cookies" in name.lower() or name.endswith(".env") for name in names)
+
+        manifest = json.loads(archive.read("manifest.json").decode("utf-8"))
+        assert manifest["database_included"] is True
+        assert manifest["counts"]["videos"] == 1
+        assert manifest["counts"]["transcripts"] == 1
+        assert manifest["counts"]["chat_messages"] == 1
+        assert manifest["counts"]["wiki_documents"] == 1
 
 
 def test_translate_transcript_to_arabic(client, monkeypatch):

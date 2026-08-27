@@ -3,6 +3,7 @@ import io
 import json
 import mimetypes
 import re
+import shutil
 import urllib.error
 import urllib.request
 from pathlib import Path
@@ -10,6 +11,7 @@ from urllib.parse import urlparse
 
 from fastapi import APIRouter, BackgroundTasks, HTTPException, Response
 from fastapi.responses import FileResponse
+from starlette.background import BackgroundTask
 
 from app.core.config import settings
 from app.db.database import get_connection
@@ -30,6 +32,7 @@ from app.models.video import (
     WikiDocumentResponse,
 )
 from app.services.audio_extractor import extract_audio, extract_audio_mp3
+from app.services.backup_service import create_full_backup
 from app.services.video_compressor import compress_video
 from app.services.chat_service import answer_from_transcript, answer_hybrid
 from app.services.library_search import remove_video_fts, upsert_video_fts
@@ -459,6 +462,20 @@ def export_videos() -> Response:
         content=buf.getvalue(),
         media_type="text/csv; charset=utf-8",
         headers={"Content-Disposition": 'attachment; filename="myinsta-library.csv"'},
+    )
+
+
+@router.get("/backup")
+def backup_library() -> FileResponse:
+    """Download a full zip backup of the SQLite data, saved media, and MyWiki files."""
+    backup = create_full_backup()
+    temp_dir = backup["temp_dir"]
+    return FileResponse(
+        backup["path"],
+        media_type="application/zip",
+        filename=backup["filename"],
+        background=BackgroundTask(lambda: shutil.rmtree(temp_dir, ignore_errors=True)),
+        headers={"Content-Disposition": f'attachment; filename="{backup["filename"]}"'},
     )
 
 

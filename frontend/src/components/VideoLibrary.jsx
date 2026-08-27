@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { deleteVideo, getExportUrl, getVideoStreamUrl, listTrash, permanentDeleteVideo, restoreVideo, searchLibrary, updateVideo } from '../api/client.js'
+import { deleteVideo, getBackupUrl, getExportUrl, getVideoStreamUrl, listTrash, permanentDeleteVideo, restoreVideo, searchLibrary, updateVideo } from '../api/client.js'
 import { useLanguage } from '../context/LanguageContext.jsx'
 
 // ── Shared helpers ────────────────────────────────────────────────────────────
@@ -587,16 +587,29 @@ export default function VideoLibrary({
           <div className="library-header-controls">
             {/* Export CSV */}
             {videos.length > 0 && (
-              <a href={getExportUrl()} download="myinsta-library.csv"
-                className="export-csv-btn" title={t('exportCsvTitle')}>
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                  strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-                  <polyline points="7 10 12 15 17 10"/>
-                  <line x1="12" y1="15" x2="12" y2="3"/>
-                </svg>
-                {t('exportCsv')}
-              </a>
+              <>
+                <a href={getBackupUrl()} download
+                  className="export-csv-btn backup-download-btn" title={t('backupFullTitle')}>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                    strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                    <polyline points="7 10 12 15 17 10"/>
+                    <line x1="12" y1="15" x2="12" y2="3"/>
+                    <path d="M4 7h16"/>
+                  </svg>
+                  {t('backupFull')}
+                </a>
+                <a href={getExportUrl()} download="myinsta-library.csv"
+                  className="export-csv-btn" title={t('exportCsvTitle')}>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                    strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                    <polyline points="7 10 12 15 17 10"/>
+                    <line x1="12" y1="15" x2="12" y2="3"/>
+                  </svg>
+                  {t('exportCsv')}
+                </a>
+              </>
             )}
 
             {/* Sort dropdown */}

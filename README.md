@@ -31,7 +31,7 @@ Implemented:
 9. View, stream, edit, soft-delete (trash/restore), permanently delete, and chat
    with saved videos.
 10. Chat answer modes: English, Arabic, bilingual; transcript or web mode.
-11. MyWiki markdown archive per video, CSV library export, Notion export.
+11. MyWiki markdown archive per video, CSV library export, full zip backup, Notion export.
 12. Retry processing for failed videos, with clearer pipeline error messages.
 13. Bilingual UI (EN/AR), dark mode, keyboard shortcuts, stats, and onboarding.
 
@@ -109,6 +109,7 @@ Base URL during development: `http://localhost:8000`
 | POST | `/api/videos/{id}/cleanup` | Clean transcript |
 | POST | `/api/videos/{id}/review` | Professional review |
 | GET | `/api/videos/export` | CSV export |
+| GET | `/api/videos/backup` | Full zip backup of SQLite data, saved media, transcripts, notes, chat history, and MyWiki files |
 | GET | `/api/videos/stats` | Library stats |
 | GET | `/api/videos/trash` | Trash list |
 
@@ -122,6 +123,11 @@ backend/data/
 ├── library/YYYY/MM/... # permanent media + transcript
 └── mywiki/             # markdown wiki files
 ```
+
+Use the app's **Full backup** button, or `GET /api/videos/backup`, to download a
+zip archive to your PC. The backup includes the SQLite database snapshot,
+library media/audio/transcript files, MyWiki markdown, and JSON table exports.
+It intentionally excludes `.env` files and YouTube/Instagram cookie files.
 
 Do not commit databases, downloads, library media, or `.env` secrets.
 

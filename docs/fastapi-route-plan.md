@@ -43,6 +43,15 @@ Purpose: list recent submitted videos.
 
 Response: array of video records without transcript details by default.
 
+## `GET /api/videos/backup`
+
+Purpose: download a complete local backup archive.
+
+Response: zip file containing a SQLite database snapshot, saved library
+media/audio/transcript files, MyWiki markdown files, and JSON exports for the
+main app tables. Secret files such as `.env` and YouTube/Instagram cookies are
+not included.
+
 ## `GET /api/videos/{video_id}`
 
 Purpose: fetch one video and its transcript if available.

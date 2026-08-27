@@ -2838,6 +2838,15 @@ kbd {
 }
 .export-csv-btn:hover  { background: #dcfce7; border-color: #86efac; }
 .export-csv-btn svg    { width: 13px; height: 13px; flex-shrink: 0; }
+.backup-download-btn {
+  color: #0f766e;
+  background: #f0fdfa;
+  border-color: #99f6e4;
+}
+.backup-download-btn:hover {
+  background: #ccfbf1;
+  border-color: #5eead4;
+}
 
 /* ── Load more ───────────────────────────────────────────────────────────── */
 .load-more-row {
@@ -3331,6 +3340,8 @@ kbd {
 /* Export + load more dark */
 [data-theme="dark"] .export-csv-btn    { background: #052e16; color: #4ade80; border-color: #166534; }
 [data-theme="dark"] .export-csv-btn:hover { background: #14532d; }
+[data-theme="dark"] .backup-download-btn { background: #042f2e; color: #5eead4; border-color: #0f766e; }
+[data-theme="dark"] .backup-download-btn:hover { background: #134e4a; }
 [data-theme="dark"] .load-more-btn     { background: #1e1b4b; color: #818cf8; border-color: #4f46e5; }
 [data-theme="dark"] .load-more-btn:hover:not(:disabled) { background: #312e81; }
 [data-theme="dark"] .all-loaded-label  { color: #475569; }

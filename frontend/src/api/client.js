@@ -209,6 +209,11 @@ export function getExportUrl() {
   return `${API_BASE_URL}/api/videos/export`
 }
 
+/** URL for direct full backup download (database + saved media + manifests) */
+export function getBackupUrl() {
+  return `${API_BASE_URL}/api/videos/backup`
+}
+
 export function updateVideo(videoId, payload) {
   return request(`/api/videos/${videoId}`, {
     method: 'PATCH',

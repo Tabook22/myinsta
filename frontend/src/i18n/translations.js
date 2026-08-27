@@ -328,6 +328,8 @@ export const translations = {
     allLoaded: (n) => `All ${n} videos loaded`,
     exportCsv: 'Export CSV',
     exportCsvTitle: 'Download your library as a spreadsheet',
+    backupFull: 'Full backup',
+    backupFullTitle: 'Download a zip with the database, saved videos, transcripts, notes, chat history, and MyWiki files',
 
     // ── Processing steps ─────────────────────────────────────────────────────
     stepDownloading:  'Downloading video',
@@ -702,6 +704,8 @@ export const translations = {
     allLoaded: (n) => `تم تحميل جميع ${n} مقاطع`,
     exportCsv: 'تصدير CSV',
     exportCsvTitle: 'تحميل مكتبتك كجدول بيانات',
+    backupFull: 'نسخة احتياطية',
+    backupFullTitle: 'تحميل ملف ZIP يحتوي قاعدة البيانات والفيديوهات والنصوص والملاحظات والدردشة وملفات ماي ويكي',
 
     // ── Processing steps ─────────────────────────────────────────────────────
     stepDownloading:  'تحميل الفيديو',

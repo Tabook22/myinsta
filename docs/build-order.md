@@ -30,6 +30,8 @@ bilingual answer modes.
     translation, cleanup, chat, retry, and friendly error mapping.
 12. Controlled YouTube support with optional duration guard.
 13. FastAPI lifespan startup (replaces deprecated `on_event`).
+14. Full library backup download (`GET /api/videos/backup`) containing a SQLite
+    snapshot, saved media/transcripts, MyWiki markdown, and JSON manifests.
 
 ## Local Verification
 

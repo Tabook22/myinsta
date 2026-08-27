@@ -250,6 +250,37 @@ export async function downloadFullBackup() {
   return { filename, size: blob.size }
 }
 
+export function startBackupJob() {
+  return request('/api/videos/backup/start', {
+    method: 'POST',
+    timeoutMs: BACKUP_TIMEOUT_MS,
+  })
+}
+
+export function getBackupJob(jobId) {
+  return request(`/api/videos/backup/jobs/${jobId}`, {
+    timeoutMs: BACKUP_TIMEOUT_MS,
+  })
+}
+
+export async function downloadBackupJob(jobId) {
+  const response = await fetchApiResponse(`/api/videos/backup/jobs/${jobId}/download`, {
+    timeoutMs: BACKUP_TIMEOUT_MS,
+    headers: {},
+  })
+  if (!response.ok) {
+    const text = await response.text()
+    throw new Error(parseErrorMessage(text) || `Backup download failed (${response.status})`)
+  }
+  const blob = await response.blob()
+  const filename = filenameFromDisposition(
+    response.headers.get('Content-Disposition'),
+    'myinsta-backup.zip',
+  )
+  triggerBrowserDownload(blob, filename)
+  return { filename, size: blob.size }
+}
+
 export async function importBackup(file) {
   const form = new FormData()
   form.append('file', file)

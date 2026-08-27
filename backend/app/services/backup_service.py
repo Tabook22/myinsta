@@ -5,12 +5,14 @@ import tempfile
 import zipfile
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Callable
 
 from app.core.config import settings
 from app.services.library_search import rebuild_library_fts
 
 
 VIDEO_PATH_COLUMNS = ("local_video_path", "local_audio_path", "local_transcript_path")
+ProgressCallback = Callable[[int, int, str], None]
 
 
 def _row_dicts(conn: sqlite3.Connection, table: str) -> list[dict]:
@@ -23,6 +25,10 @@ def _write_directory(
     source_dir: Path,
     archive_dir: str,
     written: set[Path],
+    *,
+    progress: ProgressCallback | None = None,
+    progress_state: dict | None = None,
+    stage: str = "Adding files",
 ) -> None:
     if not source_dir.exists():
         return
@@ -34,12 +40,18 @@ def _write_directory(
         resolved = path.resolve()
         archive.write(resolved, f"{archive_dir}/{resolved.relative_to(root).as_posix()}")
         written.add(resolved)
+        if progress and progress_state is not None:
+            progress_state["current"] += 1
+            progress(progress_state["current"], progress_state["total"], stage)
 
 
 def _write_referenced_files(
     archive: zipfile.ZipFile,
     videos: list[dict],
     written: set[Path],
+    *,
+    progress: ProgressCallback | None = None,
+    progress_state: dict | None = None,
 ) -> list[dict]:
     included: list[dict] = []
     path_columns = ("local_video_path", "local_audio_path", "local_transcript_path")
@@ -63,6 +75,9 @@ def _write_referenced_files(
             archive_name = f"referenced-files/video-{video['id']}/{resolved.name}"
             archive.write(resolved, archive_name)
             written.add(resolved)
+            if progress and progress_state is not None:
+                progress_state["current"] += 1
+                progress(progress_state["current"], progress_state["total"], "Adding referenced files")
             included.append(
                 {
                     "video_id": video["id"],
@@ -72,6 +87,33 @@ def _write_referenced_files(
             )
 
     return included
+
+
+def _list_files(source_dir: Path) -> list[Path]:
+    if not source_dir.exists():
+        return []
+    return [path for path in source_dir.rglob("*") if path.is_file()]
+
+
+def _count_referenced_files(videos: list[dict], written: set[Path]) -> int:
+    count = 0
+    for video in videos:
+        for column in VIDEO_PATH_COLUMNS:
+            value = video.get(column)
+            if not value:
+                continue
+            candidates = [Path(value)]
+            if column == "local_audio_path":
+                candidates.append(Path(value).with_suffix(".mp3"))
+            for candidate in candidates:
+                if not candidate.exists() or not candidate.is_file():
+                    continue
+                resolved = candidate.resolve()
+                if resolved in written:
+                    continue
+                count += 1
+                written.add(resolved)
+    return count
 
 
 def _write_database_snapshot(archive: zipfile.ZipFile, temp_dir: Path) -> bool:
@@ -356,7 +398,7 @@ def import_backup_archive(backup_file: Path) -> dict:
     return result
 
 
-def create_full_backup() -> dict:
+def create_full_backup(progress: ProgressCallback | None = None) -> dict:
     """Create a zip backup containing app data, library media, and manifests."""
     created_at = datetime.now(timezone.utc)
     stamp = created_at.strftime("%Y%m%d_%H%M%S")
@@ -370,6 +412,27 @@ def create_full_backup() -> dict:
         transcripts = _row_dicts(conn, "transcripts")
         chat_messages = _row_dicts(conn, "chat_messages")
         wiki_documents = _row_dicts(conn, "wiki_documents")
+
+    counted_files: set[Path] = set()
+    library_file_count = len(_list_files(settings.library_path))
+    wiki_file_count = len(_list_files(settings.wiki_path))
+    for path in _list_files(settings.library_path):
+        counted_files.add(path.resolve())
+    for path in _list_files(settings.wiki_path):
+        counted_files.add(path.resolve())
+    referenced_file_count = _count_referenced_files(videos, counted_files)
+    progress_state = {
+        "current": 0,
+        "total": max(1, 7 + library_file_count + wiki_file_count + referenced_file_count),
+    }
+
+    def tick(stage: str) -> None:
+        progress_state["current"] += 1
+        if progress:
+            progress(progress_state["current"], progress_state["total"], stage)
+
+    if progress:
+        progress(0, progress_state["total"], "Reading database")
 
     manifest = {
         "app": "MyInsta",
@@ -390,28 +453,57 @@ def create_full_backup() -> dict:
     }
 
     with zipfile.ZipFile(backup_path, "w", compression=zipfile.ZIP_DEFLATED, allowZip64=True) as archive:
+        tick("Copying database")
         manifest["database_included"] = _write_database_snapshot(archive, temp_dir)
-        _write_directory(archive, settings.library_path, "library", written_files)
-        _write_directory(archive, settings.wiki_path, "mywiki", written_files)
-        manifest["referenced_files"] = _write_referenced_files(archive, videos, written_files)
+        _write_directory(
+            archive,
+            settings.library_path,
+            "library",
+            written_files,
+            progress=progress,
+            progress_state=progress_state,
+            stage="Adding library files",
+        )
+        _write_directory(
+            archive,
+            settings.wiki_path,
+            "mywiki",
+            written_files,
+            progress=progress,
+            progress_state=progress_state,
+            stage="Adding MyWiki files",
+        )
+        manifest["referenced_files"] = _write_referenced_files(
+            archive,
+            videos,
+            written_files,
+            progress=progress,
+            progress_state=progress_state,
+        )
 
+        tick("Writing manifest")
         archive.writestr("manifest.json", json.dumps(manifest, indent=2, ensure_ascii=False))
+        tick("Writing video data")
         archive.writestr(
             "data/videos.json",
             json.dumps(videos, indent=2, ensure_ascii=False),
         )
+        tick("Writing transcript data")
         archive.writestr(
             "data/transcripts.json",
             json.dumps(transcripts, indent=2, ensure_ascii=False),
         )
+        tick("Writing chat history")
         archive.writestr(
             "data/chat_messages.json",
             json.dumps(chat_messages, indent=2, ensure_ascii=False),
         )
+        tick("Writing wiki data")
         archive.writestr(
             "data/wiki_documents.json",
             json.dumps(wiki_documents, indent=2, ensure_ascii=False),
         )
+        tick("Finalizing backup")
         archive.writestr(
             "README.txt",
             (
@@ -422,6 +514,9 @@ def create_full_backup() -> dict:
                 "files or YouTube/Instagram cookie files.\n"
             ),
         )
+
+    if progress:
+        progress(progress_state["total"], progress_state["total"], "Ready to download")
 
     return {
         "path": backup_path,

@@ -5,8 +5,11 @@ import mimetypes
 import re
 import shutil
 import tempfile
+import threading
+import time
 import urllib.error
 import urllib.request
+import uuid
 from pathlib import Path
 from urllib.parse import urlparse
 
@@ -59,6 +62,8 @@ from app.services.wiki_storage import (
 )
 
 router = APIRouter(prefix="/videos", tags=["videos"])
+BACKUP_JOBS: dict[str, dict] = {}
+BACKUP_JOBS_LOCK = threading.Lock()
 
 
 def _video_has_file(row) -> bool:
@@ -73,6 +78,69 @@ def _audio_has_file(row) -> bool:
         return False
     mp3_path = Path(wav_path).with_suffix(".mp3")
     return mp3_path.exists() or Path(wav_path).exists()
+
+
+def _set_backup_job(job_id: str, **updates) -> None:
+    with BACKUP_JOBS_LOCK:
+        job = BACKUP_JOBS.setdefault(job_id, {})
+        job.update(updates)
+        job["updated_at"] = time.time()
+
+
+def _get_backup_job(job_id: str) -> dict | None:
+    with BACKUP_JOBS_LOCK:
+        job = BACKUP_JOBS.get(job_id)
+        return dict(job) if job else None
+
+
+def _delete_backup_job(job_id: str) -> None:
+    with BACKUP_JOBS_LOCK:
+        BACKUP_JOBS.pop(job_id, None)
+
+
+def _run_backup_job(job_id: str) -> None:
+    def report(current: int, total: int, stage: str) -> None:
+        percent = int((current / max(total, 1)) * 100)
+        _set_backup_job(
+            job_id,
+            status="running",
+            current=current,
+            total=total,
+            percent=max(1, min(percent, 99)),
+            stage=stage,
+        )
+
+    try:
+        _set_backup_job(
+            job_id,
+            status="running",
+            current=0,
+            total=1,
+            percent=1,
+            stage="Starting backup",
+        )
+        backup = create_full_backup(progress=report)
+        path = Path(backup["path"])
+        _set_backup_job(
+            job_id,
+            status="ready",
+            percent=100,
+            current=1,
+            total=1,
+            stage="Ready to download",
+            path=str(path),
+            filename=backup["filename"],
+            temp_dir=str(backup["temp_dir"]),
+            size_bytes=path.stat().st_size if path.exists() else 0,
+        )
+    except Exception as exc:
+        _set_backup_job(
+            job_id,
+            status="failed",
+            percent=100,
+            stage="Backup failed",
+            error=str(exc),
+        )
 
 
 def _row_to_wiki_document_response(row) -> WikiDocumentResponse:
@@ -478,6 +546,71 @@ def backup_library() -> FileResponse:
         filename=backup["filename"],
         background=BackgroundTask(lambda: shutil.rmtree(temp_dir, ignore_errors=True)),
         headers={"Content-Disposition": f'attachment; filename="{backup["filename"]}"'},
+    )
+
+
+@router.post("/backup/start")
+def start_backup_job(background_tasks: BackgroundTasks) -> dict:
+    """Start a full backup job and return a progress handle."""
+    job_id = uuid.uuid4().hex
+    _set_backup_job(
+        job_id,
+        status="queued",
+        current=0,
+        total=1,
+        percent=0,
+        stage="Queued",
+        created_at=time.time(),
+    )
+    background_tasks.add_task(_run_backup_job, job_id)
+    return {"job_id": job_id}
+
+
+@router.get("/backup/jobs/{job_id}")
+def get_backup_job(job_id: str) -> dict:
+    job = _get_backup_job(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Backup job not found.")
+    payload = {
+        "job_id": job_id,
+        "status": job.get("status", "unknown"),
+        "percent": job.get("percent", 0),
+        "current": job.get("current", 0),
+        "total": job.get("total", 1),
+        "stage": job.get("stage", ""),
+        "error": job.get("error"),
+        "filename": job.get("filename"),
+        "size_bytes": job.get("size_bytes", 0),
+    }
+    if payload["status"] == "ready":
+        payload["download_url"] = f"/api/videos/backup/jobs/{job_id}/download"
+    return payload
+
+
+@router.get("/backup/jobs/{job_id}/download")
+def download_backup_job(job_id: str) -> FileResponse:
+    job = _get_backup_job(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Backup job not found.")
+    if job.get("status") != "ready":
+        raise HTTPException(status_code=400, detail="Backup is not ready yet.")
+
+    path = Path(job["path"])
+    temp_dir = Path(job["temp_dir"])
+    if not path.exists():
+        _delete_backup_job(job_id)
+        raise HTTPException(status_code=404, detail="Backup file not found.")
+
+    def cleanup() -> None:
+        shutil.rmtree(temp_dir, ignore_errors=True)
+        _delete_backup_job(job_id)
+
+    return FileResponse(
+        path,
+        media_type="application/zip",
+        filename=job["filename"],
+        background=BackgroundTask(cleanup),
+        headers={"Content-Disposition": f'attachment; filename="{job["filename"]}"'},
     )
 
 

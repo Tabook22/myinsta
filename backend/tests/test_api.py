@@ -290,6 +290,55 @@ def test_full_backup_download_includes_database_library_and_manifest(client, tmp
         assert manifest["counts"]["wiki_documents"] == 1
 
 
+def test_backup_job_reports_progress_and_downloads(client, tmp_path):
+    from app.core.config import settings
+
+    folder = settings.library_path / "2026" / "08" / "20260828_130000_progress-test"
+    folder.mkdir(parents=True)
+    (folder / "video.mp4").write_bytes(b"video")
+
+    with get_connection() as conn:
+        conn.execute(
+            """
+            INSERT INTO videos (
+                source_url, platform, status, title, local_video_path,
+                storage_folder, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                "https://www.instagram.com/reel/PROGRESS/",
+                "instagram",
+                "ready",
+                "Progress test",
+                str(folder / "video.mp4"),
+                "2026/08/20260828_130000_progress-test",
+                "2026-08-28 13:00:00",
+                "2026-08-28 13:00:00",
+            ),
+        )
+
+    started = client.post("/api/videos/backup/start")
+    assert started.status_code == 200
+    job_id = started.json()["job_id"]
+
+    status = client.get(f"/api/videos/backup/jobs/{job_id}")
+    assert status.status_code == 200
+    body = status.json()
+    assert body["status"] == "ready"
+    assert body["percent"] == 100
+    assert body["download_url"] == f"/api/videos/backup/jobs/{job_id}/download"
+
+    download = client.get(body["download_url"])
+    assert download.status_code == 200
+    archive_path = tmp_path / "job-backup.zip"
+    archive_path.write_bytes(download.content)
+    with zipfile.ZipFile(archive_path) as archive:
+        assert "manifest.json" in archive.namelist()
+
+    missing_after_download = client.get(f"/api/videos/backup/jobs/{job_id}")
+    assert missing_after_download.status_code == 404
+
+
 def test_import_backup_merges_videos_files_and_messages(client, tmp_path):
     from app.core.config import settings
 

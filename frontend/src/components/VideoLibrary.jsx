@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { deleteVideo, downloadFullBackup, getExportUrl, getVideoStreamUrl, importBackup, listTrash, permanentDeleteVideo, restoreVideo, searchLibrary, updateVideo } from '../api/client.js'
+import { deleteVideo, downloadBackupJob, getBackupJob, getExportUrl, getVideoStreamUrl, importBackup, listTrash, permanentDeleteVideo, restoreVideo, searchLibrary, startBackupJob, updateVideo } from '../api/client.js'
 import { useLanguage } from '../context/LanguageContext.jsx'
 import { useToast } from '../context/ToastContext.jsx'
 
@@ -373,6 +373,7 @@ export default function VideoLibrary({
   const [batchTagInput,  setBatchTagInput]  = useState('')
   const [showBatchTag,   setShowBatchTag]   = useState(false)
   const [downloadingBackup, setDownloadingBackup] = useState(false)
+  const [backupProgress, setBackupProgress] = useState(null)
   const [importingBackup, setImportingBackup] = useState(false)
 
   // Trash
@@ -577,14 +578,39 @@ export default function VideoLibrary({
 
   async function handleBackupDownload() {
     setDownloadingBackup(true)
+    setBackupProgress({ percent: 0, stage: t('backupQueued') })
     showToast(t('backupPreparing'), 'info', 5000)
     try {
-      const result = await downloadFullBackup()
+      const { job_id: jobId } = await startBackupJob()
+      let status = null
+      while (true) {
+        await new Promise((resolve) => window.setTimeout(resolve, 900))
+        status = await getBackupJob(jobId)
+        setBackupProgress({
+          percent: status.percent || 0,
+          stage: status.stage || t('backupPreparingShort'),
+          current: status.current,
+          total: status.total,
+        })
+        if (status.status === 'ready') break
+        if (status.status === 'failed') {
+          throw new Error(status.error || t('backupFailed'))
+        }
+      }
+
+      const result = await downloadBackupJob(jobId)
+      setBackupProgress({
+        percent: 100,
+        stage: t('backupReadyShort'),
+      })
       showToast(t('backupReady', result.filename), 'success', 5000)
     } catch (err) {
       showToast(err.message, 'error', 6000)
     } finally {
-      setDownloadingBackup(false)
+      window.setTimeout(() => {
+        setDownloadingBackup(false)
+        setBackupProgress(null)
+      }, 1400)
     }
   }
 
@@ -707,6 +733,17 @@ export default function VideoLibrary({
             </div>
           </div>
         </div>
+        {backupProgress && (
+          <div className="backup-progress" role="status" aria-live="polite">
+            <div className="backup-progress-meta">
+              <span>{backupProgress.stage}</span>
+              <strong>{Math.round(backupProgress.percent)}%</strong>
+            </div>
+            <div className="backup-progress-track" aria-hidden="true">
+              <span style={{ width: `${Math.max(4, Math.min(backupProgress.percent, 100))}%` }} />
+            </div>
+          </div>
+        )}
       </div>
 
       {/* ── Tag filter bar ── */}

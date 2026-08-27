@@ -52,6 +52,17 @@ media/audio/transcript files, MyWiki markdown files, and JSON exports for the
 main app tables. Secret files such as `.env` and YouTube/Instagram cookies are
 not included.
 
+## `POST /api/videos/backup/start`
+
+Purpose: start a full backup job and return a `job_id` for progress tracking.
+
+Related endpoints:
+
+- `GET /api/videos/backup/jobs/{job_id}` returns `status`, `percent`, `stage`,
+  and the download URL when ready.
+- `GET /api/videos/backup/jobs/{job_id}/download` downloads the finished zip and
+  clears the temporary server-side backup file.
+
 ## `POST /api/videos/backup/import`
 
 Purpose: merge a MyInsta backup zip into the current library.

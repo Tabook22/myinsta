@@ -264,21 +264,13 @@ export function getBackupJob(jobId) {
 }
 
 export async function downloadBackupJob(jobId) {
-  const response = await fetchApiResponse(`/api/videos/backup/jobs/${jobId}/download`, {
-    timeoutMs: BACKUP_TIMEOUT_MS,
-    headers: {},
-  })
-  if (!response.ok) {
-    const text = await response.text()
-    throw new Error(parseErrorMessage(text) || `Backup download failed (${response.status})`)
-  }
-  const blob = await response.blob()
-  const filename = filenameFromDisposition(
-    response.headers.get('Content-Disposition'),
-    'myinsta-backup.zip',
-  )
-  triggerBrowserDownload(blob, filename)
-  return { filename, size: blob.size }
+  const link = document.createElement('a')
+  link.href = `${API_BASE_URL}/api/videos/backup/jobs/${jobId}/download`
+  link.download = ''
+  document.body.appendChild(link)
+  link.click()
+  link.remove()
+  return { filename: 'myinsta-backup.zip', size: 0 }
 }
 
 export async function importBackup(file) {

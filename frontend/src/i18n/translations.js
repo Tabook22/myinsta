@@ -330,6 +330,14 @@ export const translations = {
     exportCsvTitle: 'Download your library as a spreadsheet',
     backupFull: 'Full backup',
     backupFullTitle: 'Download a zip with the database, saved videos, transcripts, notes, chat history, and MyWiki files',
+    backupPreparingShort: 'Preparing...',
+    backupPreparing: 'Preparing your full backup. Keep this page open; large video libraries can take a minute.',
+    backupReady: (filename) => `Backup ready: ${filename}`,
+    backupImport: 'Import backup',
+    backupImportTitle: 'Import a MyInsta backup zip into this library',
+    backupImportingShort: 'Importing...',
+    backupImporting: 'Importing backup into this library. Keep the app open.',
+    backupImportDone: (created, updated) => `Backup imported: ${created} new, ${updated} updated.`,
 
     // ── Processing steps ─────────────────────────────────────────────────────
     stepDownloading:  'Downloading video',
@@ -706,6 +714,14 @@ export const translations = {
     exportCsvTitle: 'تحميل مكتبتك كجدول بيانات',
     backupFull: 'نسخة احتياطية',
     backupFullTitle: 'تحميل ملف ZIP يحتوي قاعدة البيانات والفيديوهات والنصوص والملاحظات والدردشة وملفات ماي ويكي',
+    backupPreparingShort: 'جارٍ التجهيز...',
+    backupPreparing: 'جارٍ تجهيز النسخة الاحتياطية الكاملة. أبقِ الصفحة مفتوحة؛ المكتبات الكبيرة قد تحتاج دقيقة.',
+    backupReady: (filename) => `النسخة جاهزة: ${filename}`,
+    backupImport: 'استيراد نسخة',
+    backupImportTitle: 'استيراد ملف MyInsta ZIP إلى هذه المكتبة',
+    backupImportingShort: 'جارٍ الاستيراد...',
+    backupImporting: 'جارٍ استيراد النسخة إلى هذه المكتبة. أبقِ التطبيق مفتوحاً.',
+    backupImportDone: (created, updated) => `تم الاستيراد: ${created} جديد، ${updated} محدّث.`,
 
     // ── Processing steps ─────────────────────────────────────────────────────
     stepDownloading:  'تحميل الفيديو',

@@ -4,18 +4,20 @@ import json
 import mimetypes
 import re
 import shutil
+import tempfile
 import urllib.error
 import urllib.request
 from pathlib import Path
 from urllib.parse import urlparse
 
-from fastapi import APIRouter, BackgroundTasks, HTTPException, Response
+from fastapi import APIRouter, BackgroundTasks, File, HTTPException, Response, UploadFile
 from fastapi.responses import FileResponse
 from starlette.background import BackgroundTask
 
 from app.core.config import settings
 from app.db.database import get_connection
 from app.models.video import (
+    BackupImportResponse,
     ChatHistoryResponse,
     ChatMessageResponse,
     ChatRequest,
@@ -32,7 +34,7 @@ from app.models.video import (
     WikiDocumentResponse,
 )
 from app.services.audio_extractor import extract_audio, extract_audio_mp3
-from app.services.backup_service import create_full_backup
+from app.services.backup_service import create_full_backup, import_backup_archive
 from app.services.video_compressor import compress_video
 from app.services.chat_service import answer_from_transcript, answer_hybrid
 from app.services.library_search import remove_video_fts, upsert_video_fts
@@ -477,6 +479,33 @@ def backup_library() -> FileResponse:
         background=BackgroundTask(lambda: shutil.rmtree(temp_dir, ignore_errors=True)),
         headers={"Content-Disposition": f'attachment; filename="{backup["filename"]}"'},
     )
+
+
+@router.post("/backup/import", response_model=BackupImportResponse)
+async def import_library_backup(file: UploadFile = File(...)) -> BackupImportResponse:
+    """Merge a MyInsta backup zip into the current library."""
+    filename = file.filename or ""
+    if filename and not filename.lower().endswith(".zip"):
+        raise HTTPException(status_code=400, detail="Upload a MyInsta .zip backup file.")
+
+    fd, tmp_name = tempfile.mkstemp(prefix="myinsta-import-", suffix=".zip")
+    tmp_path = Path(tmp_name)
+    try:
+        with open(fd, "wb", closefd=True) as destination:
+            while True:
+                chunk = await file.read(1024 * 1024)
+                if not chunk:
+                    break
+                destination.write(chunk)
+        result = import_backup_archive(tmp_path)
+        return BackupImportResponse(**result)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Backup import failed: {exc}") from exc
+    finally:
+        tmp_path.unlink(missing_ok=True)
+        await file.close()
 
 
 @router.get("/stats")

@@ -290,6 +290,139 @@ def test_full_backup_download_includes_database_library_and_manifest(client, tmp
         assert manifest["counts"]["wiki_documents"] == 1
 
 
+def test_import_backup_merges_videos_files_and_messages(client, tmp_path):
+    from app.core.config import settings
+
+    backup_path = tmp_path / "myinsta-backup.zip"
+    source_url = "https://www.youtube.com/watch?v=IMPORT"
+    storage_folder = "2026/08/20260828_120000_import-test"
+    remote_video_path = f"/opt/myinsta/backend/data/library/{storage_folder}/video.mp4"
+    remote_audio_path = f"/opt/myinsta/backend/data/library/{storage_folder}/audio.wav"
+    remote_transcript_path = f"/opt/myinsta/backend/data/library/{storage_folder}/transcript.txt"
+    remote_wiki_path = "/opt/myinsta/backend/data/mywiki/import-test.md"
+
+    with zipfile.ZipFile(backup_path, "w") as archive:
+        archive.writestr("manifest.json", json.dumps({"app": "MyInsta", "backup_version": 1}))
+        archive.writestr(f"library/{storage_folder}/video.mp4", b"video")
+        archive.writestr(f"library/{storage_folder}/audio.wav", b"audio")
+        archive.writestr(f"library/{storage_folder}/transcript.txt", "Imported transcript")
+        archive.writestr("mywiki/import-test.md", "# Imported wiki")
+        archive.writestr(
+            "data/videos.json",
+            json.dumps([
+                {
+                    "id": 42,
+                    "source_url": source_url,
+                    "platform": "youtube",
+                    "title": "Imported video",
+                    "description": "Imported description",
+                    "uploader": "creator",
+                    "duration_seconds": 12,
+                    "thumbnail_url": None,
+                    "local_video_path": remote_video_path,
+                    "local_audio_path": remote_audio_path,
+                    "storage_stamp": "20260828_120000_import-test",
+                    "storage_folder": storage_folder,
+                    "local_transcript_path": remote_transcript_path,
+                    "status": "ready",
+                    "error_message": None,
+                    "content_type": "speech",
+                    "creator_url": None,
+                    "notes": "Imported notes",
+                    "tags": json.dumps(["sync"]),
+                    "deleted_at": None,
+                    "processing_step": None,
+                    "created_at": "2026-08-28 12:00:00",
+                    "updated_at": "2026-08-28 12:00:00",
+                }
+            ]),
+        )
+        archive.writestr(
+            "data/transcripts.json",
+            json.dumps([
+                {
+                    "id": 7,
+                    "video_id": 42,
+                    "language": "en",
+                    "full_text": "Imported transcript",
+                    "segments_json": "[]",
+                    "created_at": "2026-08-28 12:00:00",
+                    "updated_at": "2026-08-28 12:00:00",
+                }
+            ]),
+        )
+        archive.writestr(
+            "data/chat_messages.json",
+            json.dumps([
+                {
+                    "id": 9,
+                    "video_id": 42,
+                    "role": "user",
+                    "content": "What is this?",
+                    "created_at": "2026-08-28 12:01:00",
+                }
+            ]),
+        )
+        archive.writestr(
+            "data/wiki_documents.json",
+            json.dumps([
+                {
+                    "id": 3,
+                    "video_id": 42,
+                    "title": "Imported video",
+                    "filename": "import-test.md",
+                    "file_path": remote_wiki_path,
+                    "created_at": "2026-08-28 12:02:00",
+                    "updated_at": "2026-08-28 12:02:00",
+                }
+            ]),
+        )
+
+    response = client.post(
+        "/api/videos/backup/import",
+        files={"file": ("myinsta-backup.zip", backup_path.read_bytes(), "application/zip")},
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["videos_created"] == 1
+    assert body["videos_updated"] == 0
+    assert body["transcripts_imported"] == 1
+    assert body["chat_messages_imported"] == 1
+    assert body["wiki_documents_imported"] == 1
+    assert body["files_imported"] == 4
+
+    local_video_file = settings.library_path / storage_folder / "video.mp4"
+    assert local_video_file.read_bytes() == b"video"
+    assert (settings.wiki_path / "import-test.md").read_text(encoding="utf-8") == "# Imported wiki"
+
+    with get_connection() as conn:
+        row = conn.execute("SELECT * FROM videos WHERE source_url = ?", (source_url,)).fetchone()
+        assert row is not None
+        assert row["local_video_path"] == str(local_video_file.resolve())
+        video_id = row["id"]
+        transcript = conn.execute(
+            "SELECT full_text FROM transcripts WHERE video_id = ?",
+            (video_id,),
+        ).fetchone()
+        assert transcript["full_text"] == "Imported transcript"
+        messages = conn.execute(
+            "SELECT COUNT(*) FROM chat_messages WHERE video_id = ?",
+            (video_id,),
+        ).fetchone()[0]
+        assert messages == 1
+
+    second_response = client.post(
+        "/api/videos/backup/import",
+        files={"file": ("myinsta-backup.zip", backup_path.read_bytes(), "application/zip")},
+    )
+    assert second_response.status_code == 200
+    assert second_response.json()["videos_created"] == 0
+    with get_connection() as conn:
+        messages = conn.execute("SELECT COUNT(*) FROM chat_messages").fetchone()[0]
+        assert messages == 1
+
+
 def test_translate_transcript_to_arabic(client, monkeypatch):
     calls = []
 

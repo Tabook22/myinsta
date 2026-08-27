@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { deleteVideo, getBackupUrl, getExportUrl, getVideoStreamUrl, listTrash, permanentDeleteVideo, restoreVideo, searchLibrary, updateVideo } from '../api/client.js'
+import { deleteVideo, downloadFullBackup, getExportUrl, getVideoStreamUrl, importBackup, listTrash, permanentDeleteVideo, restoreVideo, searchLibrary, updateVideo } from '../api/client.js'
 import { useLanguage } from '../context/LanguageContext.jsx'
+import { useToast } from '../context/ToastContext.jsx'
 
 // ── Shared helpers ────────────────────────────────────────────────────────────
 const TAG_COLORS = [
@@ -344,7 +345,9 @@ export default function VideoLibrary({
   onLoadMore, selectedId, onView, onEdit, onDeleted, onRetry, onRefresh,
 }) {
   const { t, lang } = useLanguage()
+  const { showToast } = useToast()
   const locale = lang === 'ar' ? 'ar-SA' : 'en-US'
+  const backupFileRef = useRef(null)
 
   // Persistent preferences — default to grid for a more visual library
   const [viewMode, setViewMode] = useState(() => localStorage.getItem('lib-view') || 'grid')
@@ -369,6 +372,8 @@ export default function VideoLibrary({
   const [selectedIds,    setSelectedIds]    = useState(new Set())
   const [batchTagInput,  setBatchTagInput]  = useState('')
   const [showBatchTag,   setShowBatchTag]   = useState(false)
+  const [downloadingBackup, setDownloadingBackup] = useState(false)
+  const [importingBackup, setImportingBackup] = useState(false)
 
   // Trash
   const [trashItems,    setTrashItems]    = useState([])
@@ -570,6 +575,40 @@ export default function VideoLibrary({
     setTrashItems([])
   }
 
+  async function handleBackupDownload() {
+    setDownloadingBackup(true)
+    showToast(t('backupPreparing'), 'info', 5000)
+    try {
+      const result = await downloadFullBackup()
+      showToast(t('backupReady', result.filename), 'success', 5000)
+    } catch (err) {
+      showToast(err.message, 'error', 6000)
+    } finally {
+      setDownloadingBackup(false)
+    }
+  }
+
+  async function handleBackupImport(event) {
+    const file = event.target.files?.[0]
+    if (!file) return
+    setImportingBackup(true)
+    showToast(t('backupImporting'), 'info', 5000)
+    try {
+      const result = await importBackup(file)
+      showToast(
+        t('backupImportDone', result.videos_created, result.videos_updated),
+        'success',
+        7000,
+      )
+      onRefresh?.()
+    } catch (err) {
+      showToast(err.message, 'error', 7000)
+    } finally {
+      setImportingBackup(false)
+      if (backupFileRef.current) backupFileRef.current.value = ''
+    }
+  }
+
   // ── Render ─────────────────────────────────────────────────────────────────
   const hasSelection = selectedIds.size > 0
 
@@ -588,8 +627,11 @@ export default function VideoLibrary({
             {/* Export CSV */}
             {videos.length > 0 && (
               <>
-                <a href={getBackupUrl()} download
-                  className="export-csv-btn backup-download-btn" title={t('backupFullTitle')}>
+                <button type="button"
+                  className="export-csv-btn backup-download-btn"
+                  title={t('backupFullTitle')}
+                  onClick={handleBackupDownload}
+                  disabled={downloadingBackup || importingBackup}>
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
                     strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
@@ -597,8 +639,25 @@ export default function VideoLibrary({
                     <line x1="12" y1="15" x2="12" y2="3"/>
                     <path d="M4 7h16"/>
                   </svg>
-                  {t('backupFull')}
-                </a>
+                  {downloadingBackup ? t('backupPreparingShort') : t('backupFull')}
+                </button>
+                <label className={`export-csv-btn backup-import-btn${importingBackup ? ' is-disabled' : ''}`}
+                  title={t('backupImportTitle')}>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                    strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                    <polyline points="17 8 12 3 7 8"/>
+                    <line x1="12" y1="3" x2="12" y2="15"/>
+                  </svg>
+                  {importingBackup ? t('backupImportingShort') : t('backupImport')}
+                  <input
+                    ref={backupFileRef}
+                    type="file"
+                    accept=".zip,application/zip"
+                    disabled={downloadingBackup || importingBackup}
+                    onChange={handleBackupImport}
+                  />
+                </label>
                 <a href={getExportUrl()} download="myinsta-library.csv"
                   className="export-csv-btn" title={t('exportCsvTitle')}>
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"

@@ -2835,9 +2835,17 @@ kbd {
   transition: background 0.15s, border-color 0.15s;
   white-space: nowrap;
   flex-shrink: 0;
+  font-family: inherit;
+  cursor: pointer;
 }
 .export-csv-btn:hover  { background: #dcfce7; border-color: #86efac; }
 .export-csv-btn svg    { width: 13px; height: 13px; flex-shrink: 0; }
+.export-csv-btn:disabled,
+.export-csv-btn.is-disabled {
+  opacity: 0.65;
+  cursor: default;
+  pointer-events: none;
+}
 .backup-download-btn {
   color: #0f766e;
   background: #f0fdfa;
@@ -2846,6 +2854,18 @@ kbd {
 .backup-download-btn:hover {
   background: #ccfbf1;
   border-color: #5eead4;
+}
+.backup-import-btn {
+  color: #2563eb;
+  background: #eff6ff;
+  border-color: #bfdbfe;
+}
+.backup-import-btn:hover {
+  background: #dbeafe;
+  border-color: #93c5fd;
+}
+.backup-import-btn input {
+  display: none;
 }
 
 /* ── Load more ───────────────────────────────────────────────────────────── */
@@ -3342,6 +3362,8 @@ kbd {
 [data-theme="dark"] .export-csv-btn:hover { background: #14532d; }
 [data-theme="dark"] .backup-download-btn { background: #042f2e; color: #5eead4; border-color: #0f766e; }
 [data-theme="dark"] .backup-download-btn:hover { background: #134e4a; }
+[data-theme="dark"] .backup-import-btn { background: #172554; color: #93c5fd; border-color: #1d4ed8; }
+[data-theme="dark"] .backup-import-btn:hover { background: #1e3a8a; }
 [data-theme="dark"] .load-more-btn     { background: #1e1b4b; color: #818cf8; border-color: #4f46e5; }
 [data-theme="dark"] .load-more-btn:hover:not(:disabled) { background: #312e81; }
 [data-theme="dark"] .all-loaded-label  { color: #475569; }

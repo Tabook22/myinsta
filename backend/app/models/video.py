@@ -133,3 +133,14 @@ class DescriptionTranslationResponse(BaseModel):
     video_id: int
     target_language: Literal["ar"]
     translated_text: str
+
+
+class BackupImportResponse(BaseModel):
+    ok: bool
+    message: str
+    videos_created: int = 0
+    videos_updated: int = 0
+    transcripts_imported: int = 0
+    chat_messages_imported: int = 0
+    wiki_documents_imported: int = 0
+    files_imported: int = 0

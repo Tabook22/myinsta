@@ -1,4 +1,5 @@
 import json
+import shutil
 import sqlite3
 import tempfile
 import zipfile
@@ -6,6 +7,10 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from app.core.config import settings
+from app.services.library_search import rebuild_library_fts
+
+
+VIDEO_PATH_COLUMNS = ("local_video_path", "local_audio_path", "local_transcript_path")
 
 
 def _row_dicts(conn: sqlite3.Connection, table: str) -> list[dict]:
@@ -87,6 +92,268 @@ def _write_database_snapshot(archive: zipfile.ZipFile, temp_dir: Path) -> bool:
 
     archive.write(snapshot_path, "database/myinsta.sqlite3")
     return True
+
+
+def _read_json_member(archive: zipfile.ZipFile, name: str) -> list[dict]:
+    try:
+        with archive.open(name) as fh:
+            payload = json.loads(fh.read().decode("utf-8"))
+    except KeyError:
+        return []
+    if not isinstance(payload, list):
+        return []
+    return [item for item in payload if isinstance(item, dict)]
+
+
+def _safe_archive_target(root: Path, relative_name: str) -> Path:
+    target = (root / relative_name).resolve()
+    root_resolved = root.resolve()
+    if target != root_resolved and root_resolved not in target.parents:
+        raise ValueError(f"Unsafe archive path: {relative_name}")
+    return target
+
+
+def _copy_archive_directory(archive: zipfile.ZipFile, archive_dir: str, target_dir: Path) -> int:
+    imported = 0
+    prefix = f"{archive_dir.rstrip('/')}/"
+    for member in archive.infolist():
+        if member.is_dir() or not member.filename.startswith(prefix):
+            continue
+        relative_name = member.filename.removeprefix(prefix)
+        if not relative_name:
+            continue
+        target = _safe_archive_target(target_dir, relative_name)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        with archive.open(member) as source, target.open("wb") as destination:
+            shutil.copyfileobj(source, destination)
+        imported += 1
+    return imported
+
+
+def _table_columns(conn: sqlite3.Connection, table: str) -> set[str]:
+    rows = conn.execute(f"PRAGMA table_info({table})").fetchall()
+    return {row["name"] for row in rows}
+
+
+def _local_library_file(storage_folder: str | None, original_path: str | None) -> str | None:
+    if not storage_folder or not original_path:
+        return None
+    filename = Path(original_path).name
+    if not filename:
+        return None
+    path = settings.library_path / storage_folder / filename
+    return str(path.resolve()) if path.exists() else None
+
+
+def _rewrite_video_paths(video: dict) -> dict:
+    rewritten = dict(video)
+    storage_folder = rewritten.get("storage_folder")
+    for column in VIDEO_PATH_COLUMNS:
+        rewritten[column] = _local_library_file(storage_folder, rewritten.get(column))
+    return rewritten
+
+
+def _int_or_none(value) -> int | None:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _upsert_by_columns(
+    conn: sqlite3.Connection,
+    table: str,
+    row: dict,
+    *,
+    conflict_column: str,
+    conflict_value,
+    skip_update_columns: set[str] | None = None,
+) -> bool:
+    columns = _table_columns(conn, table)
+    payload = {
+        key: value
+        for key, value in row.items()
+        if key in columns and key != "id"
+    }
+    existing = conn.execute(
+        f"SELECT id FROM {table} WHERE {conflict_column} = ?",
+        (conflict_value,),
+    ).fetchone()
+
+    if existing:
+        skipped = skip_update_columns or set()
+        update_payload = {
+            key: value
+            for key, value in payload.items()
+            if key not in skipped and key != conflict_column
+        }
+        if update_payload:
+            assignments = ", ".join(f"{key} = ?" for key in update_payload)
+            conn.execute(
+                f"UPDATE {table} SET {assignments} WHERE id = ?",
+                (*update_payload.values(), existing["id"]),
+            )
+        return False
+
+    if not payload:
+        return False
+
+    names = ", ".join(payload)
+    placeholders = ", ".join("?" for _ in payload)
+    conn.execute(
+        f"INSERT INTO {table} ({names}) VALUES ({placeholders})",
+        tuple(payload.values()),
+    )
+    return True
+
+
+def import_backup_archive(backup_file: Path) -> dict:
+    """Merge a MyInsta backup zip into the current local library."""
+    if not zipfile.is_zipfile(backup_file):
+        raise ValueError("File is not a valid zip archive.")
+
+    result = {
+        "ok": True,
+        "message": "Backup imported.",
+        "videos_created": 0,
+        "videos_updated": 0,
+        "transcripts_imported": 0,
+        "chat_messages_imported": 0,
+        "wiki_documents_imported": 0,
+        "files_imported": 0,
+    }
+
+    settings.library_path.mkdir(parents=True, exist_ok=True)
+    settings.wiki_path.mkdir(parents=True, exist_ok=True)
+
+    with zipfile.ZipFile(backup_file) as archive:
+        names = set(archive.namelist())
+        if "manifest.json" not in names or "data/videos.json" not in names:
+            raise ValueError("This does not look like a MyInsta backup zip.")
+
+        result["files_imported"] += _copy_archive_directory(
+            archive,
+            "library",
+            settings.library_path,
+        )
+        result["files_imported"] += _copy_archive_directory(
+            archive,
+            "mywiki",
+            settings.wiki_path,
+        )
+
+        videos = _read_json_member(archive, "data/videos.json")
+        transcripts = _read_json_member(archive, "data/transcripts.json")
+        chat_messages = _read_json_member(archive, "data/chat_messages.json")
+        wiki_documents = _read_json_member(archive, "data/wiki_documents.json")
+
+    id_map: dict[int, int] = {}
+    with sqlite3.connect(settings.database_file) as conn:
+        conn.row_factory = sqlite3.Row
+        conn.execute("PRAGMA foreign_keys = ON")
+
+        for original_video in videos:
+            source_url = original_video.get("source_url")
+            if not source_url:
+                continue
+            incoming_id = _int_or_none(original_video.get("id"))
+            video = _rewrite_video_paths(original_video)
+            existing = conn.execute(
+                "SELECT id FROM videos WHERE source_url = ?",
+                (source_url,),
+            ).fetchone()
+            created = _upsert_by_columns(
+                conn,
+                "videos",
+                video,
+                conflict_column="source_url",
+                conflict_value=source_url,
+                skip_update_columns={"source_url"},
+            )
+            local = conn.execute(
+                "SELECT id FROM videos WHERE source_url = ?",
+                (source_url,),
+            ).fetchone()
+            if incoming_id is not None and local:
+                id_map[incoming_id] = int(local["id"])
+            if created:
+                result["videos_created"] += 1
+            elif existing:
+                result["videos_updated"] += 1
+
+        for transcript in transcripts:
+            original_video_id = _int_or_none(transcript.get("video_id"))
+            if original_video_id is None or original_video_id not in id_map:
+                continue
+            local_video_id = id_map[original_video_id]
+            payload = dict(transcript)
+            payload["video_id"] = local_video_id
+            _upsert_by_columns(
+                conn,
+                "transcripts",
+                payload,
+                conflict_column="video_id",
+                conflict_value=local_video_id,
+                skip_update_columns={"video_id"},
+            )
+            result["transcripts_imported"] += 1
+
+        chat_columns = _table_columns(conn, "chat_messages")
+        for message in chat_messages:
+            original_video_id = _int_or_none(message.get("video_id"))
+            if original_video_id is None or original_video_id not in id_map:
+                continue
+            local_video_id = id_map[original_video_id]
+            role = message.get("role")
+            content = message.get("content")
+            created_at = message.get("created_at")
+            if not role or not content:
+                continue
+            existing = conn.execute(
+                """
+                SELECT id FROM chat_messages
+                WHERE video_id = ? AND role = ? AND content = ? AND created_at = ?
+                """,
+                (local_video_id, role, content, created_at),
+            ).fetchone()
+            if existing:
+                continue
+            payload = {
+                key: value
+                for key, value in message.items()
+                if key in chat_columns and key not in {"id", "video_id"}
+            }
+            payload["video_id"] = local_video_id
+            names = ", ".join(payload)
+            placeholders = ", ".join("?" for _ in payload)
+            conn.execute(
+                f"INSERT INTO chat_messages ({names}) VALUES ({placeholders})",
+                tuple(payload.values()),
+            )
+            result["chat_messages_imported"] += 1
+
+        for document in wiki_documents:
+            original_video_id = _int_or_none(document.get("video_id"))
+            if original_video_id is None or original_video_id not in id_map:
+                continue
+            local_video_id = id_map[original_video_id]
+            payload = dict(document)
+            payload["video_id"] = local_video_id
+            if payload.get("filename"):
+                payload["file_path"] = str((settings.wiki_path / payload["filename"]).resolve())
+            _upsert_by_columns(
+                conn,
+                "wiki_documents",
+                payload,
+                conflict_column="video_id",
+                conflict_value=local_video_id,
+                skip_update_columns={"video_id"},
+            )
+            result["wiki_documents_imported"] += 1
+
+        rebuild_library_fts(conn)
+
+    return result
 
 
 def create_full_backup() -> dict:

@@ -129,6 +129,16 @@ zip archive to your PC. The backup includes the SQLite database snapshot,
 library media/audio/transcript files, MyWiki markdown, and JSON table exports.
 It intentionally excludes `.env` files and YouTube/Instagram cookie files.
 
+To synchronize VPS data into a local PC library:
+
+1. Open the VPS app and click **Full backup**.
+2. Open the local app on the PC.
+3. Click **Import backup** and choose the downloaded zip.
+
+Import merges by `source_url`, copies archived media/wiki files into the local
+data folders, rewrites file paths for the current machine, and does not delete
+local-only videos.
+
 Do not commit databases, downloads, library media, or `.env` secrets.
 
 ## VPS Deploy

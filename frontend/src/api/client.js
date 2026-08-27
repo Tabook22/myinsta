@@ -82,6 +82,7 @@ function parseErrorMessage(text) {
 
 const REQUEST_TIMEOUT_MS = 10_000 // 10 seconds - fail fast if backend is down
 const TRANSLATION_TIMEOUT_MS = 60_000 // Longer text can take a little while
+const BACKUP_TIMEOUT_MS = 15 * 60_000 // Large video libraries can take time to zip/upload
 
 async function fetchApiResponse(path, options = {}) {
   const { timeoutMs = REQUEST_TIMEOUT_MS, ...fetchOptions } = options
@@ -212,6 +213,78 @@ export function getExportUrl() {
 /** URL for direct full backup download (database + saved media + manifests) */
 export function getBackupUrl() {
   return `${API_BASE_URL}/api/videos/backup`
+}
+
+function filenameFromDisposition(value, fallback) {
+  const match = /filename="?([^"]+)"?/i.exec(value || '')
+  return match?.[1] || fallback
+}
+
+function triggerBrowserDownload(blob, filename) {
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = filename
+  document.body.appendChild(link)
+  link.click()
+  link.remove()
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000)
+}
+
+export async function downloadFullBackup() {
+  const response = await fetchApiResponse('/api/videos/backup', {
+    timeoutMs: BACKUP_TIMEOUT_MS,
+    headers: {},
+  })
+  if (!response.ok) {
+    const text = await response.text()
+    throw new Error(parseErrorMessage(text) || `Backup failed with status ${response.status}`)
+  }
+
+  const blob = await response.blob()
+  const filename = filenameFromDisposition(
+    response.headers.get('Content-Disposition'),
+    'myinsta-backup.zip',
+  )
+  triggerBrowserDownload(blob, filename)
+  return { filename, size: blob.size }
+}
+
+export async function importBackup(file) {
+  const form = new FormData()
+  form.append('file', file)
+
+  const failures = []
+  for (const apiBaseUrl of API_BASE_URLS) {
+    const controller = new AbortController()
+    const timer = setTimeout(() => controller.abort(), BACKUP_TIMEOUT_MS)
+    try {
+      const response = await fetch(`${apiBaseUrl}/api/videos/backup/import`, {
+        method: 'POST',
+        body: form,
+        signal: controller.signal,
+        cache: 'no-store',
+      })
+      if (!response.ok) {
+        const text = await response.text()
+        throw new Error(parseErrorMessage(text) || `Import failed (${response.status})`)
+      }
+      return response.json()
+    } catch (err) {
+      failures.push(err)
+      if (err.message && !err.message.includes('fetch') && err.name !== 'AbortError' && err.name !== 'TypeError') {
+        throw err
+      }
+    } finally {
+      clearTimeout(timer)
+    }
+  }
+
+  if (failures.some((err) => err.name === 'AbortError')) {
+    throw new Error('Backup import took too long — please try again with the server running locally.')
+  }
+  const last = failures[failures.length - 1]
+  throw last instanceof Error ? last : new Error('Cannot reach server — check your connection.')
 }
 
 export function updateVideo(videoId, payload) {

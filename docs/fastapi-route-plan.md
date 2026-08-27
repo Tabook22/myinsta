@@ -52,6 +52,20 @@ media/audio/transcript files, MyWiki markdown files, and JSON exports for the
 main app tables. Secret files such as `.env` and YouTube/Instagram cookies are
 not included.
 
+## `POST /api/videos/backup/import`
+
+Purpose: merge a MyInsta backup zip into the current library.
+
+Behavior:
+
+1. Copy archived `library/` files into the current machine's library folder.
+2. Copy archived `mywiki/` markdown into the current MyWiki folder.
+3. Merge videos by `source_url` instead of raw database IDs.
+4. Rewrite media/transcript/wiki file paths for the current machine.
+5. Import transcripts, chat history, and wiki document metadata.
+6. Rebuild the local search index.
+7. Never delete local-only records during import.
+
 ## `GET /api/videos/{video_id}`
 
 Purpose: fetch one video and its transcript if available.

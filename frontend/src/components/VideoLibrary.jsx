@@ -375,6 +375,7 @@ export default function VideoLibrary({
   const [downloadingBackup, setDownloadingBackup] = useState(false)
   const [backupProgress, setBackupProgress] = useState(null)
   const [importingBackup, setImportingBackup] = useState(false)
+  const [importProgress, setImportProgress] = useState(null)
 
   // Trash
   const [trashItems,    setTrashItems]    = useState([])
@@ -618,9 +619,13 @@ export default function VideoLibrary({
     const file = event.target.files?.[0]
     if (!file) return
     setImportingBackup(true)
+    setImportProgress({ percent: 0, stage: t('backupImportQueued') })
     showToast(t('backupImporting'), 'info', 5000)
     try {
-      const result = await importBackup(file)
+      const result = await importBackup(file, (progress) => {
+        setImportProgress(progress)
+      })
+      setImportProgress({ percent: 100, stage: t('backupImportReady') })
       showToast(
         t('backupImportDone', result.videos_created, result.videos_updated),
         'success',
@@ -630,7 +635,10 @@ export default function VideoLibrary({
     } catch (err) {
       showToast(err.message, 'error', 7000)
     } finally {
-      setImportingBackup(false)
+      window.setTimeout(() => {
+        setImportingBackup(false)
+        setImportProgress(null)
+      }, 1400)
       if (backupFileRef.current) backupFileRef.current.value = ''
     }
   }
@@ -741,6 +749,17 @@ export default function VideoLibrary({
             </div>
             <div className="backup-progress-track" aria-hidden="true">
               <span style={{ width: `${Math.max(4, Math.min(backupProgress.percent, 100))}%` }} />
+            </div>
+          </div>
+        )}
+        {importProgress && (
+          <div className="backup-progress import-progress" role="status" aria-live="polite">
+            <div className="backup-progress-meta">
+              <span>{importProgress.stage}</span>
+              <strong>{Math.round(importProgress.percent)}%</strong>
+            </div>
+            <div className="backup-progress-track" aria-hidden="true">
+              <span style={{ width: `${Math.max(4, Math.min(importProgress.percent, 100))}%` }} />
             </div>
           </div>
         )}

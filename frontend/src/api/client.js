@@ -273,33 +273,58 @@ export async function downloadBackupJob(jobId) {
   return { filename: 'myinsta-backup.zip', size: 0 }
 }
 
-export async function importBackup(file) {
+export async function importBackup(file, onProgress) {
   const form = new FormData()
   form.append('file', file)
 
   const failures = []
   for (const apiBaseUrl of API_BASE_URLS) {
-    const controller = new AbortController()
-    const timer = setTimeout(() => controller.abort(), BACKUP_TIMEOUT_MS)
     try {
-      const response = await fetch(`${apiBaseUrl}/api/videos/backup/import`, {
-        method: 'POST',
-        body: form,
-        signal: controller.signal,
-        cache: 'no-store',
+      return await new Promise((resolve, reject) => {
+        const request = new XMLHttpRequest()
+        const timer = window.setTimeout(() => {
+          request.abort()
+          reject(new Error('Backup import took too long — please try again with the server running locally.'))
+        }, BACKUP_TIMEOUT_MS)
+
+        request.open('POST', `${apiBaseUrl}/api/videos/backup/import`)
+        request.responseType = 'text'
+        request.upload.onprogress = (event) => {
+          if (!event.lengthComputable) return
+          const percent = Math.round((event.loaded / event.total) * 88)
+          onProgress?.({
+            percent: Math.max(1, Math.min(percent, 88)),
+            stage: `Uploading ${Math.round((event.loaded / event.total) * 100)}%`,
+          })
+        }
+        request.onload = () => {
+          window.clearTimeout(timer)
+          if (request.status >= 200 && request.status < 300) {
+            onProgress?.({ percent: 95, stage: 'Merging backup' })
+            try {
+              resolve(JSON.parse(request.responseText || '{}'))
+            } catch {
+              reject(new Error('Import finished, but the server response could not be read.'))
+            }
+            return
+          }
+          reject(new Error(parseErrorMessage(request.responseText) || `Import failed (${request.status})`))
+        }
+        request.onerror = () => {
+          window.clearTimeout(timer)
+          reject(new Error('Cannot reach server — check your connection.'))
+        }
+        request.onabort = () => {
+          window.clearTimeout(timer)
+          reject(new Error('Backup import was cancelled.'))
+        }
+        request.send(form)
       })
-      if (!response.ok) {
-        const text = await response.text()
-        throw new Error(parseErrorMessage(text) || `Import failed (${response.status})`)
-      }
-      return response.json()
     } catch (err) {
       failures.push(err)
       if (err.message && !err.message.includes('fetch') && err.name !== 'AbortError' && err.name !== 'TypeError') {
         throw err
       }
-    } finally {
-      clearTimeout(timer)
     }
   }
 

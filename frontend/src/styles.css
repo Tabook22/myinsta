@@ -4199,6 +4199,45 @@ kbd {
   flex-wrap: wrap;
   gap: 8px;
 }
+.settings-sync-panel {
+  border: 1px solid var(--border, #e2e8f0);
+  border-radius: 12px;
+  padding: 12px;
+  margin: 4px 0 14px;
+  background: var(--surface-2, #f8fafc);
+}
+.settings-sync-panel h4 {
+  margin: 0 0 6px;
+  font-size: 0.95rem;
+}
+.settings-sync-grid {
+  display: grid;
+  grid-template-columns: minmax(120px, 0.45fr) minmax(0, 1fr);
+  gap: 10px;
+  margin: 10px 0;
+}
+.settings-sync-grid label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  font-size: 13px;
+  font-weight: 700;
+}
+.settings-sync-grid select,
+.settings-sync-grid input {
+  min-width: 0;
+  height: 38px;
+  border: 1px solid var(--border, #dbe3ef);
+  border-radius: 8px;
+  padding: 0 10px;
+  background: var(--surface, #fff);
+  color: var(--text, #0f172a);
+  font: inherit;
+}
+.settings-sync-btn {
+  width: 100%;
+}
 .settings-steps {
   margin: 8px 0 0;
   padding-inline-start: 18px;
@@ -4209,3 +4248,14 @@ kbd {
 [data-theme="dark"] .settings-pill-ok { background: #052e16; color: #86efac; }
 [data-theme="dark"] .settings-pill-bad { background: #450a0a; color: #fca5a5; }
 [data-theme="dark"] .settings-privacy { background: #1e1b4b; color: #c7d2fe; }
+[data-theme="dark"] .settings-sync-grid select,
+[data-theme="dark"] .settings-sync-grid input {
+  background: #0f172a;
+  border-color: #334155;
+  color: #e2e8f0;
+}
+@media (max-width: 640px) {
+  .settings-sync-grid {
+    grid-template-columns: 1fr;
+  }
+}

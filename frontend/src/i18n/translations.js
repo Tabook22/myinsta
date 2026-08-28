@@ -112,6 +112,15 @@ export const translations = {
     settingsStep2: 'Export with “Get cookies.txt LOCALLY” (YouTube tab only).',
     settingsStep3: 'Upload the file here — it must include LOGIN_INFO.',
     settingsStep4: 'Retry a failed YouTube video in the library.',
+    settingsExtractTitle: 'Extract from this PC',
+    settingsExtractHelp:
+      'Use your signed-in local browser to refresh YouTube cookies, save them locally, and send the validated file to the VPS.',
+    settingsBrowser: 'Browser',
+    settingsRemoteUrl: 'Remote API URL',
+    settingsExtractBtn: 'Extract & send to VPS',
+    settingsExtracting: 'Extracting YouTube cookies from your local browser and sending them to the VPS.',
+    settingsExtractingShort: 'Extracting…',
+    settingsExtractOk: 'YouTube cookies refreshed locally and sent to the VPS.',
 
     // ── Study workspace ──────────────────────────────────────────────────────
     studyMode: 'Study mode',
@@ -502,6 +511,15 @@ export const translations = {
     settingsStep2: 'صدّر بامتداد Get cookies.txt LOCALLY من تبويب يوتيوب.',
     settingsStep3: 'ارفع الملف هنا — يجب أن يحتوي LOGIN_INFO.',
     settingsStep4: 'أعد محاولة فيديو يوتيوب الفاشل من المكتبة.',
+    settingsExtractTitle: 'استخراج من هذا الجهاز',
+    settingsExtractHelp:
+      'استخدم المتصفح المحلي المسجّل في يوتيوب لتحديث ملفات تعريف يوتيوب، حفظها محلياً، وإرسال الملف بعد التحقق إلى الخادم.',
+    settingsBrowser: 'المتصفح',
+    settingsRemoteUrl: 'رابط API للخادم',
+    settingsExtractBtn: 'استخراج وإرسال للخادم',
+    settingsExtracting: 'جارٍ استخراج ملفات تعريف يوتيوب من المتصفح المحلي وإرسالها إلى الخادم.',
+    settingsExtractingShort: 'جارٍ الاستخراج…',
+    settingsExtractOk: 'تم تحديث ملفات تعريف يوتيوب محلياً وإرسالها إلى الخادم.',
 
     // ── Study workspace ──────────────────────────────────────────────────────
     studyMode: 'وضع الدراسة',

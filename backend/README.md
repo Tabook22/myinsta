@@ -52,11 +52,20 @@ python -m yt_dlp --js-runtimes node --remote-components ejs:github \
 
 Incomplete cookies (SID only, no `LOGIN_INFO`) are **skipped** — they make bot checks worse.
 
-### Upload cookies from the website (recommended)
+### Refresh cookies from the app (recommended)
 
-In the app UI: **⚙ Settings → YouTube cookies → choose cookies.txt → Upload & save**.
+In the local app UI: **⚙ Settings → YouTube cookies → Extract from this PC → Extract & send to VPS**.
+
+- Local MyInsta extracts cookies from the selected signed-in browser through yt-dlp.
+- The backend validates the extracted Netscape cookies before saving anything.
+- Valid cookies are saved locally, then sent to the configured remote API URL
+  (`MYINSTA_YOUTUBE_COOKIE_SYNC_REMOTE_URL`, default `https://www.nasserdiary.com/myinsta-api`).
+- Cookie contents are never returned to the browser UI.
+
+Manual fallback: **⚙ Settings → YouTube cookies → choose cookies.txt → Upload & save**.
 
 - API: `GET/POST /api/settings/youtube-cookies`
+- Extract API: `POST /api/settings/youtube-cookies/extract`
 - File is written to `YOUTUBE_COOKIES_FILE` (or app default under `data/`)
 - Rejects uploads **without `LOGIN_INFO`**
 - No restart required after a successful upload — click **Retry** on a failed video

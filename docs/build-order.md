@@ -32,6 +32,8 @@ bilingual answer modes.
 13. FastAPI lifespan startup (replaces deprecated `on_event`).
 14. Full library backup download (`GET /api/videos/backup`) containing a SQLite
     snapshot, saved media/transcripts, MyWiki markdown, and JSON manifests.
+15. YouTube cookie maintenance from Settings: manual cookies.txt upload plus
+    local browser extraction and optional VPS sync.
 
 ## Local Verification
 

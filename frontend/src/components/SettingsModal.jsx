@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { getYoutubeCookiesStatus, uploadYoutubeCookies } from '../api/client.js'
+import { extractAndSyncYoutubeCookies, getYoutubeCookiesStatus, uploadYoutubeCookies } from '../api/client.js'
 import { useLanguage } from '../context/LanguageContext.jsx'
 import { useToast } from '../context/ToastContext.jsx'
 
@@ -11,15 +11,23 @@ function StatusPill({ ok, label }) {
   )
 }
 
+function isLocalBrowserHost() {
+  if (typeof window === 'undefined') return true
+  return ['localhost', '127.0.0.1', '::1'].includes(window.location.hostname)
+}
+
 export default function SettingsModal({ onClose }) {
   const { t } = useLanguage()
   const { showToast } = useToast()
   const fileRef = useRef(null)
   const [loading, setLoading] = useState(true)
   const [uploading, setUploading] = useState(false)
+  const [extracting, setExtracting] = useState(false)
   const [error, setError] = useState('')
   const [status, setStatus] = useState(null)
   const [selectedName, setSelectedName] = useState('')
+  const [browser, setBrowser] = useState('chrome')
+  const [remoteUrl, setRemoteUrl] = useState('')
 
   async function loadStatus() {
     setLoading(true)
@@ -27,6 +35,7 @@ export default function SettingsModal({ onClose }) {
     try {
       const data = await getYoutubeCookiesStatus()
       setStatus(data)
+      setRemoteUrl((current) => current || data.remote_api_base_url || '')
     } catch (err) {
       setError(err.message)
     } finally {
@@ -74,8 +83,31 @@ export default function SettingsModal({ onClose }) {
     }
   }
 
+  async function handleExtractAndSync() {
+    setExtracting(true)
+    setError('')
+    showToast(t('settingsExtracting'), 'info', 7000)
+    try {
+      const result = await extractAndSyncYoutubeCookies(browser, remoteUrl)
+      setStatus({
+        path: result.path,
+        cookies: result.cookies,
+        hint: status?.hint,
+        configured_env: status?.configured_env,
+        remote_api_base_url: remoteUrl || status?.remote_api_base_url,
+      })
+      showToast(result.message || t('settingsExtractOk'), 'success', 9000)
+    } catch (err) {
+      setError(err.message)
+      showToast(err.message, 'error', 9000)
+    } finally {
+      setExtracting(false)
+    }
+  }
+
   const cookies = status?.cookies || {}
   const usable = Boolean(cookies.usable)
+  const canExtractFromThisPc = isLocalBrowserHost()
 
   return (
     <div className="settings-backdrop" onClick={onClose} role="presentation">
@@ -167,6 +199,45 @@ export default function SettingsModal({ onClose }) {
               </button>
             </div>
           </form>
+
+          {canExtractFromThisPc ? (
+            <div className="settings-sync-panel">
+              <div>
+                <h4>{t('settingsExtractTitle')}</h4>
+                <p className="settings-help">{t('settingsExtractHelp')}</p>
+              </div>
+              <div className="settings-sync-grid">
+                <label>
+                  <span>{t('settingsBrowser')}</span>
+                  <select value={browser} onChange={(e) => setBrowser(e.target.value)} disabled={extracting || uploading}>
+                    <option value="chrome">Chrome</option>
+                    <option value="edge">Edge</option>
+                    <option value="firefox">Firefox</option>
+                    <option value="brave">Brave</option>
+                    <option value="chromium">Chromium</option>
+                  </select>
+                </label>
+                <label>
+                  <span>{t('settingsRemoteUrl')}</span>
+                  <input
+                    type="url"
+                    value={remoteUrl}
+                    onChange={(e) => setRemoteUrl(e.target.value)}
+                    placeholder="https://www.nasserdiary.com/myinsta-api"
+                    disabled={extracting || uploading}
+                  />
+                </label>
+              </div>
+              <button
+                type="button"
+                className="btn-primary settings-sync-btn"
+                onClick={handleExtractAndSync}
+                disabled={extracting || uploading || loading}
+              >
+                {extracting ? t('settingsExtractingShort') : t('settingsExtractBtn')}
+              </button>
+            </div>
+          ) : null}
 
           {error ? <p className="error">{error}</p> : null}
 

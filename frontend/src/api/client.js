@@ -462,3 +462,16 @@ export async function uploadYoutubeCookies(file) {
   const last = failures[failures.length - 1]
   throw last instanceof Error ? last : new Error('Cannot reach server — check your connection.')
 }
+
+/** Extract cookies from the local browser through the local backend and optionally sync them to VPS */
+export function extractAndSyncYoutubeCookies(browser = 'chrome', remoteApiBaseUrl = '') {
+  return request('/api/settings/youtube-cookies/extract', {
+    method: 'POST',
+    timeoutMs: TRANSLATION_TIMEOUT_MS,
+    body: JSON.stringify({
+      browser,
+      sync_remote: true,
+      remote_api_base_url: remoteApiBaseUrl || null,
+    }),
+  })
+}

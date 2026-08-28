@@ -18,6 +18,7 @@ class Settings(BaseSettings):
     instagram_cookies_file: str = Field(default="", alias="INSTAGRAM_COOKIES_FILE")
     youtube_cookies_file: str = Field(default="", alias="YOUTUBE_COOKIES_FILE")
     youtube_cookies_from_browser: str = Field(default="", alias="YOUTUBE_COOKIES_FROM_BROWSER")
+    youtube_cookie_sync_remote_url: str = "https://www.nasserdiary.com/myinsta-api"
     # Optional HTTP(S) proxy for YouTube only, e.g. http://user:pass@host:port
     youtube_proxy: str = Field(default="", alias="YOUTUBE_PROXY")
 

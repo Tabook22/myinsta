@@ -155,8 +155,9 @@ def _safe_archive_target(root: Path, relative_name: str) -> Path:
     return target
 
 
-def _copy_archive_directory(archive: zipfile.ZipFile, archive_dir: str, target_dir: Path) -> int:
+def _copy_archive_directory(archive: zipfile.ZipFile, archive_dir: str, target_dir: Path) -> tuple[int, int]:
     imported = 0
+    skipped = 0
     prefix = f"{archive_dir.rstrip('/')}/"
     for member in archive.infolist():
         if member.is_dir() or not member.filename.startswith(prefix):
@@ -165,11 +166,14 @@ def _copy_archive_directory(archive: zipfile.ZipFile, archive_dir: str, target_d
         if not relative_name:
             continue
         target = _safe_archive_target(target_dir, relative_name)
+        if target.exists() and target.is_file() and target.stat().st_size == member.file_size:
+            skipped += 1
+            continue
         target.parent.mkdir(parents=True, exist_ok=True)
         with archive.open(member) as source, target.open("wb") as destination:
             shutil.copyfileobj(source, destination)
         imported += 1
-    return imported
+    return imported, skipped
 
 
 def _table_columns(conn: sqlite3.Connection, table: str) -> set[str]:
@@ -202,6 +206,13 @@ def _int_or_none(value) -> int | None:
         return None
 
 
+def _row_matches(existing: sqlite3.Row, payload: dict) -> bool:
+    for key, value in payload.items():
+        if existing[key] != value:
+            return False
+    return True
+
+
 def _upsert_by_columns(
     conn: sqlite3.Connection,
     table: str,
@@ -210,7 +221,7 @@ def _upsert_by_columns(
     conflict_column: str,
     conflict_value,
     skip_update_columns: set[str] | None = None,
-) -> bool:
+) -> str:
     columns = _table_columns(conn, table)
     payload = {
         key: value
@@ -218,27 +229,30 @@ def _upsert_by_columns(
         if key in columns and key != "id"
     }
     existing = conn.execute(
-        f"SELECT id FROM {table} WHERE {conflict_column} = ?",
+        f"SELECT * FROM {table} WHERE {conflict_column} = ?",
         (conflict_value,),
     ).fetchone()
 
     if existing:
         skipped = skip_update_columns or set()
+        server_managed_columns = {"created_at", "updated_at"}
         update_payload = {
             key: value
             for key, value in payload.items()
-            if key not in skipped and key != conflict_column
+            if key not in skipped and key != conflict_column and key not in server_managed_columns
         }
+        if not update_payload or _row_matches(existing, update_payload):
+            return "unchanged"
         if update_payload:
             assignments = ", ".join(f"{key} = ?" for key in update_payload)
             conn.execute(
                 f"UPDATE {table} SET {assignments} WHERE id = ?",
                 (*update_payload.values(), existing["id"]),
             )
-        return False
+        return "updated"
 
     if not payload:
-        return False
+        return "unchanged"
 
     names = ", ".join(payload)
     placeholders = ", ".join("?" for _ in payload)
@@ -246,7 +260,7 @@ def _upsert_by_columns(
         f"INSERT INTO {table} ({names}) VALUES ({placeholders})",
         tuple(payload.values()),
     )
-    return True
+    return "created"
 
 
 def import_backup_archive(backup_file: Path) -> dict:
@@ -263,6 +277,8 @@ def import_backup_archive(backup_file: Path) -> dict:
         "chat_messages_imported": 0,
         "wiki_documents_imported": 0,
         "files_imported": 0,
+        "files_skipped": 0,
+        "already_exists": False,
     }
 
     settings.library_path.mkdir(parents=True, exist_ok=True)
@@ -273,16 +289,20 @@ def import_backup_archive(backup_file: Path) -> dict:
         if "manifest.json" not in names or "data/videos.json" not in names:
             raise ValueError("This does not look like a MyInsta backup zip.")
 
-        result["files_imported"] += _copy_archive_directory(
+        imported, skipped = _copy_archive_directory(
             archive,
             "library",
             settings.library_path,
         )
-        result["files_imported"] += _copy_archive_directory(
+        result["files_imported"] += imported
+        result["files_skipped"] += skipped
+        imported, skipped = _copy_archive_directory(
             archive,
             "mywiki",
             settings.wiki_path,
         )
+        result["files_imported"] += imported
+        result["files_skipped"] += skipped
 
         videos = _read_json_member(archive, "data/videos.json")
         transcripts = _read_json_member(archive, "data/transcripts.json")
@@ -304,7 +324,7 @@ def import_backup_archive(backup_file: Path) -> dict:
                 "SELECT id FROM videos WHERE source_url = ?",
                 (source_url,),
             ).fetchone()
-            created = _upsert_by_columns(
+            action = _upsert_by_columns(
                 conn,
                 "videos",
                 video,
@@ -318,9 +338,9 @@ def import_backup_archive(backup_file: Path) -> dict:
             ).fetchone()
             if incoming_id is not None and local:
                 id_map[incoming_id] = int(local["id"])
-            if created:
+            if action == "created":
                 result["videos_created"] += 1
-            elif existing:
+            elif action == "updated":
                 result["videos_updated"] += 1
 
         for transcript in transcripts:
@@ -330,7 +350,7 @@ def import_backup_archive(backup_file: Path) -> dict:
             local_video_id = id_map[original_video_id]
             payload = dict(transcript)
             payload["video_id"] = local_video_id
-            _upsert_by_columns(
+            action = _upsert_by_columns(
                 conn,
                 "transcripts",
                 payload,
@@ -338,7 +358,8 @@ def import_backup_archive(backup_file: Path) -> dict:
                 conflict_value=local_video_id,
                 skip_update_columns={"video_id"},
             )
-            result["transcripts_imported"] += 1
+            if action in {"created", "updated"}:
+                result["transcripts_imported"] += 1
 
         chat_columns = _table_columns(conn, "chat_messages")
         for message in chat_messages:
@@ -383,7 +404,7 @@ def import_backup_archive(backup_file: Path) -> dict:
             payload["video_id"] = local_video_id
             if payload.get("filename"):
                 payload["file_path"] = str((settings.wiki_path / payload["filename"]).resolve())
-            _upsert_by_columns(
+            action = _upsert_by_columns(
                 conn,
                 "wiki_documents",
                 payload,
@@ -391,9 +412,22 @@ def import_backup_archive(backup_file: Path) -> dict:
                 conflict_value=local_video_id,
                 skip_update_columns={"video_id"},
             )
-            result["wiki_documents_imported"] += 1
+            if action in {"created", "updated"}:
+                result["wiki_documents_imported"] += 1
 
         rebuild_library_fts(conn)
+
+    changed_count = (
+        result["videos_created"]
+        + result["videos_updated"]
+        + result["transcripts_imported"]
+        + result["chat_messages_imported"]
+        + result["wiki_documents_imported"]
+        + result["files_imported"]
+    )
+    if changed_count == 0:
+        result["already_exists"] = True
+        result["message"] = "Everything in this backup already exists locally. Nothing new was added."
 
     return result
 

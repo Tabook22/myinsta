@@ -626,12 +626,16 @@ export default function VideoLibrary({
         setImportProgress(progress)
       })
       setImportProgress({ percent: 100, stage: t('backupImportReady') })
-      showToast(
-        t('backupImportDone', result.videos_created, result.videos_updated),
-        'success',
-        7000,
-      )
-      onRefresh?.()
+      if (result.already_exists) {
+        showToast(result.message || t('backupAlreadyExists'), 'info', 7000)
+      } else {
+        showToast(
+          t('backupImportDone', result.videos_created, result.videos_updated),
+          'success',
+          7000,
+        )
+        onRefresh?.()
+      }
     } catch (err) {
       showToast(err.message, 'error', 7000)
     } finally {

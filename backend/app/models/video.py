@@ -138,9 +138,11 @@ class DescriptionTranslationResponse(BaseModel):
 class BackupImportResponse(BaseModel):
     ok: bool
     message: str
+    already_exists: bool = False
     videos_created: int = 0
     videos_updated: int = 0
     transcripts_imported: int = 0
     chat_messages_imported: int = 0
     wiki_documents_imported: int = 0
     files_imported: int = 0
+    files_skipped: int = 0

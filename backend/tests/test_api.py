@@ -466,7 +466,16 @@ def test_import_backup_merges_videos_files_and_messages(client, tmp_path):
         files={"file": ("myinsta-backup.zip", backup_path.read_bytes(), "application/zip")},
     )
     assert second_response.status_code == 200
-    assert second_response.json()["videos_created"] == 0
+    second_body = second_response.json()
+    assert second_body["already_exists"] is True
+    assert second_body["videos_created"] == 0
+    assert second_body["videos_updated"] == 0
+    assert second_body["transcripts_imported"] == 0
+    assert second_body["chat_messages_imported"] == 0
+    assert second_body["wiki_documents_imported"] == 0
+    assert second_body["files_imported"] == 0
+    assert second_body["files_skipped"] == 4
+    assert "already exists" in second_body["message"]
     with get_connection() as conn:
         messages = conn.execute("SELECT COUNT(*) FROM chat_messages").fetchone()[0]
         assert messages == 1

@@ -343,6 +343,7 @@ export const translations = {
     backupImportingShort: 'Importing...',
     backupImporting: 'Importing backup into this library. Keep the app open.',
     backupImportDone: (created, updated) => `Backup imported: ${created} new, ${updated} updated.`,
+    backupAlreadyExists: 'Everything in this backup already exists locally. Nothing new was added.',
 
     // ── Processing steps ─────────────────────────────────────────────────────
     stepDownloading:  'Downloading video',
@@ -732,6 +733,7 @@ export const translations = {
     backupImportingShort: 'جارٍ الاستيراد...',
     backupImporting: 'جارٍ استيراد النسخة إلى هذه المكتبة. أبقِ التطبيق مفتوحاً.',
     backupImportDone: (created, updated) => `تم الاستيراد: ${created} جديد، ${updated} محدّث.`,
+    backupAlreadyExists: 'كل ما في هذه النسخة موجود محلياً بالفعل. لم تتم إضافة أي شيء جديد.',
 
     // ── Processing steps ─────────────────────────────────────────────────────
     stepDownloading:  'تحميل الفيديو',

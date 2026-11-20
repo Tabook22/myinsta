@@ -13,6 +13,7 @@ YouTube actively challenges automated clients. Strategy (2026):
 from __future__ import annotations
 
 import json
+import os
 import re
 import shutil
 import subprocess
@@ -267,8 +268,6 @@ def _node_version() -> tuple[int, int, int] | None:
     if not node:
         return None
     try:
-        import subprocess
-
         out = subprocess.run(
             [node, "-v"],
             capture_output=True,
@@ -626,8 +625,6 @@ def _attempt_download(
 
 def _youtube_cli_env() -> dict:
     """Build env so systemd can find node/ffmpeg like an interactive shell."""
-    import os
-
     env = os.environ.copy()
     path_parts = env.get("PATH", "").split(os.pathsep)
     for extra in ("/usr/local/bin", "/usr/bin", "/bin"):

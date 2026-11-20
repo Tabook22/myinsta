@@ -397,6 +397,15 @@ def process_video(video_id: int) -> None:
             },
         )
 
+        # Move the MP3 (extracted for high-quality playback) into the library folder
+        mp3_src = audio_path.with_suffix(".mp3")
+        if mp3_src.exists() and library_result.get("local_audio_path"):
+            try:
+                mp3_dst = Path(library_result["local_audio_path"]).parent / "audio.mp3"
+                shutil.move(str(mp3_src), mp3_dst)
+            except Exception:
+                pass  # MP3 move is optional; WAV fallback still works
+
         with get_connection() as conn:
             conn.execute(
                 """
@@ -763,7 +772,9 @@ def get_video(video_id: int) -> VideoResponse:
 @router.patch("/{video_id}", response_model=VideoResponse)
 def update_video(video_id: int, payload: VideoUpdateRequest) -> VideoResponse:
     with get_connection() as conn:
-        row = conn.execute("SELECT * FROM videos WHERE id = ?", (video_id,)).fetchone()
+        row = conn.execute(
+            "SELECT * FROM videos WHERE id = ? AND deleted_at IS NULL", (video_id,)
+        ).fetchone()
         if not row:
             raise HTTPException(status_code=404, detail="Video not found")
 
